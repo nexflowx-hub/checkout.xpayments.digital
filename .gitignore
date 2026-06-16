@@ -50,5 +50,12 @@ test
 prompt
 
 server.log
+
+# database
+/db/
+
+# download artifacts
+/download/
+
 # Skills directory
 /skills/
