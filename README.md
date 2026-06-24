@@ -1,23 +1,20 @@
-# XPayments — Hosted Checkout
+# XPayments — Hosted Checkout (Frontend Client)
 
-> Plataforma de checkout **White-Label Multi-Tenant** com **Smart Routing** para Stripe e PIX (MISTIC).
-> Construída com Next.js 16, TypeScript, Tailwind CSS 4 e shadcn/ui.
+> Checkout White-Label Multi-Tenant que consome o **Master Backend (Spaceship)** via API REST.
+> Não contém base de dados, rotas de API próprias, nem lógica de roteamento de pagamentos.
+> Construído com Next.js 16, TypeScript, Tailwind CSS 4 e shadcn/ui.
 
 ---
 
 ## Visão Geral
 
-O `checkout.xpayments.digital` é um frontend de checkout hospedado (hosted checkout) que se adapta dinamicamente à identidade visual de cada comerciante (seller). A página assume automaticamente as cores, logótipo e nome da loja com base nos dados devolvidos pela API da gateway.
+O `checkout.xpayments.digital` é um **frontend client puro**. Todas as decisões de roteamento, criação de transações e gestão de gateways são feitas pelo Master Backend. O Checkout apenas:
 
-### Características Principais
-
-- **White-Label Multi-Tenant** — Branding dinâmico (cor, logo, nome) injetado via inline styles
-- **Smart Routing** — Roteamento automático entre gateways (Stripe para EUR, PIX/MISTIC para BRL)
-- **Layout Responsivo** — 2 colunas (desktop) / empilhado (mobile), mobile-first
-- **Stripe Payment Element** — Integração completa com `@stripe/react-stripe-js` e theming dinâmico
-- **PIX com QR Code** — Geração de QR Code via `qrcode.react`, countdown de expiração, copy-to-clipboard
-- **Type-Safe** — TypeScript strict com tipos definidos para toda a API contract
-- **Mock APIs** — Rotas de mock para desenvolvimento sem backend
+1. Recebe um `urlCode` na URL
+2. Faz fetch ao Master Backend para obter dados da loja e do produto
+3. Aplica branding dinâmico (cor, logo, nome)
+4. Coleta dados do cliente e envia ao Master Backend para iniciar o pagamento
+5. Renderiza o gateway retornado (Stripe ou PIX)
 
 ---
 
@@ -26,43 +23,49 @@ O `checkout.xpayments.digital` é um frontend de checkout hospedado (hosted chec
 ```
 src/
 ├── app/
-│   ├── page.tsx                              # Landing page com demonstrações
-│   ├── layout.tsx                            # Root layout (Geist font, metadata)
+│   ├── page.tsx                              # Landing page (informacional)
+│   ├── layout.tsx                            # Root layout
 │   ├── globals.css                           # Tailwind CSS 4 + tema shadcn/ui
-│   ├── pay/
-│   │   └── [urlCode]/
-│   │       └── page.tsx                      # Página principal do checkout (rota dinâmica)
-│   └── api/
-│       ├── payment-links/
-│       │   └── [urlCode]/
-│       │       └── route.ts                  # GET /api/payment-links/:urlCode  (Mock)
-│       └── checkout/
-│           └── initiate/
-│               └── route.ts                  # POST /api/checkout/initiate    (Mock)
+│   └── pay/
+│       └── [urlCode]/
+│           └── page.tsx                      # Checkout (client-side fetch ao Master Backend)
 ├── components/
 │   ├── checkout/
-│   │   ├── OrderSummary.tsx                  # Painel esquerdo: resumo do pedido + branding
+│   │   ├── OrderSummary.tsx                  # Resumo do pedido + branding da loja
 │   │   ├── CustomerDetailsForm.tsx           # Step 1: Nome, Email, País
 │   │   ├── StripePaymentForm.tsx             # Step 2: Stripe Elements + PaymentElement
 │   │   └── PixPaymentForm.tsx                # Step 2: QR Code + PIX Copia e Cola
-│   └── ui/                                   # shadcn/ui component library
+│   └── ui/                                   # shadcn/ui components
 └── types/
-    └── checkout.ts                           # Tipos TypeScript + helper functions
+    └── checkout.ts                           # TypeScript types + helpers
+```
+
+### Fluxo de Dados
+
+```
+Browser (Checkout)                    Master Backend (Spaceship)
+     │                                          │
+     ├─ GET /api/v1/payment-links/:urlCode ───→│  Devolve: { id, storeId, amountFiat, currency, branding }
+     │                                          │
+     ├─ POST /api/v1/checkout/initiate ───────→│  Recebe: { storeId, amountFiat, currency, customerDetails }
+     │                                          │  Devolve: { gateway, checkoutData: { clientSecret | pixCode } }
+     │←─────────────────────────────────────────│
+     │                                          │
+     ├─ Stripe: stripe.confirmPayment() ──────→│  Webhook confirma nos bastidores
+     │                                          │
+     └─ PIX: QR Code gerado pelo backend ──────│  Webhook confirma nos bastidores
 ```
 
 ---
 
-## Fluxo de Checkout (3 Passos)
+## Fluxo de Checkout
 
-### PASSO A — Carregar Link de Pagamento
+### Passo 1 — Carregar Dados
 
 ```
-GET ${NEXT_PUBLIC_API_URL}/api/v1/payment-links/:urlCode
+GET ${NEXT_PUBLIC_MASTER_API}/api/v1/payment-links/:urlCode
 ```
 
-**Request:** `urlCode` (path param)
-
-**Response:**
 ```json
 {
   "success": true,
@@ -70,36 +73,31 @@ GET ${NEXT_PUBLIC_API_URL}/api/v1/payment-links/:urlCode
     "id": "pl_01",
     "storeId": "store_pt_001",
     "name": "Sapatilhas Nike Air Max 90",
-    "amountFiat": 15000,
+    "amountFiat": 150.00,
     "currency": "EUR",
     "branding": {
       "storeName": "Nike Store",
       "logo": "https://cdn.example.com/logo.png",
-      "color": "#111111"
+      "color": "#C8A84E"
     }
   }
 }
 ```
 
-A cor `branding.color` é aplicada em:
-- Header do checkout (border-bottom)
-- Botão principal de pagamento (background)
-- Step indicator (bolinha ativa)
-- Ícones do OrderSummary
+A `branding.color` é injetada via inline styles no header, botões e step indicator.
 
 ---
 
-### PASSO B — Dados do Cliente + Smart Routing
+### Passo 2 — Iniciar Pagamento
 
 ```
-POST ${NEXT_PUBLIC_API_URL}/api/v1/checkout/initiate
+POST ${NEXT_PUBLIC_MASTER_API}/api/v1/checkout/initiate
 ```
 
-**Request:**
 ```json
 {
   "storeId": "store_pt_001",
-  "amountFiat": 15000,
+  "amountFiat": 150.00,
   "currency": "EUR",
   "customerDetails": {
     "fullName": "João Silva",
@@ -109,166 +107,76 @@ POST ${NEXT_PUBLIC_API_URL}/api/v1/checkout/initiate
 }
 ```
 
----
+O Master Backend devolve o gateway escolhido (Smart Routing):
 
-### PASSO C — Renderizar Gateway
-
-**Response (Stripe):**
 ```json
 {
   "success": true,
   "data": {
     "gateway": "STRIPE_PT_002",
     "checkoutData": {
-      "clientSecret": "pi_3MtwBwLkdIwHu7ix0l4t3W8Q_secret_...",
-      "providerTxId": "txn_stripe_1718400000000",
-      "publishableKey": "pk_live_..."
+      "clientSecret": "pi_3MtwBwLkdIwHu7ix...",
+      "providerTxId": "txn_stripe_..."
     }
   }
 }
 ```
 
-**Response (PIX/MISTIC):**
-```json
-{
-  "success": true,
-  "data": {
-    "gateway": "MISTIC_BR_001",
-    "checkoutData": {
-      "pixCode": "00020126580014br.gov.bcb.pix0136...",
-      "providerTxId": "txn_pix_1718400000000",
-      "expiresAt": "2025-06-15T22:00:00.000Z"
-    }
-  }
-}
-```
-
-**Lógica de Routing:**
-- Se `gateway` contém `"STRIPE"` → Renderiza `StripePaymentForm`
-- Se `gateway` contém `"MISTIC"` ou `"PIX"` → Renderiza `PixPaymentForm`
-
 ---
 
-## Tipos TypeScript
+### Passo 3 — Renderizar Gateway
 
-Todos os tipos encontram-se em [`src/types/checkout.ts`](src/types/checkout.ts):
-
-```typescript
-// Entidades principais
-interface Branding       { storeName: string; logo?: string; color: string }
-interface PaymentLinkData { id: string; storeId: string; name: string; amountFiat: number; currency: string; branding: Branding }
-interface CustomerDetails { fullName: string; email: string; country: string }
-
-// Gateway responses
-interface StripeCheckoutData { clientSecret: string; providerTxId: string; publishableKey?: string }
-interface PixCheckoutData    { pixCode: string; providerTxId: string; qrCodeBase64?: string; expiresAt?: string }
-
-// Helpers
-isStripeGateway(gateway: string): boolean    // "STRIPE_PT_002" → true
-isPixGateway(gateway: string): boolean        // "MISTIC_BR_001" → true
-isStripeCheckoutData(data): boolean           // Type guard
-formatCurrency(amount: number, currency: string): string  // 15000, "EUR" → "€150.00"
-```
-
-> **Nota:** `amountFiat` é sempre em centavos (integer). A função `formatCurrency()` divide por 100.
-
----
-
-## Componentes
-
-### `OrderSummary`
-Painel lateral esquerdo (desktop) ou inline (mobile) com:
-- Avatar/Logo da loja (ou iniciais com `brandColor`)
-- Nome do item, quantidade e preço total
-- Badges: "Pagamento seguro" + moeda
-
-### `CustomerDetailsForm`
-Formulário Step 1 com validação client-side:
-- **Nome Completo** — mínimo 2 caracteres
-- **Email** — validação regex
-- **País** — Select com 12 países (PT, BR, ES, FR, DE, IT, GB, US, AO, MZ, CV, Outro)
-- Botão "Continuar para Pagamento" com `brandColor`
-
-### `StripePaymentForm`
-Integração Stripe em duas camadas:
-- **Wrapper** — Carrega `loadStripe(publishableKey)`, configura `<Elements>` com `appearance` dinâmico (`colorPrimary: brandColor`)
-- **Inner Form** — Usa `useStripe()` + `useElements()` + `<PaymentElement layout="tabs" />`, chama `stripe.confirmPayment()`
-- **Fallback Demo** — Se não houver `publishableKey`, mostra modo demonstração com botão "Simular Pagamento"
-
-### `PixPaymentForm`
-Pagamento PIX completo:
-- **QR Code** — `<QRCodeSVG>` 200px, nível H, com overlay de expiração
-- **Countdown** — Timer `MM:SS` com `setInterval(1000ms)`, muda para "Expirado" quando `expiresAt` passa
-- **Copia e Cola** — `navigator.clipboard.writeText()` com fallback `execCommand("copy")`
-- **Estado visual** — Feedback "Copiado" com check verde
+- Se `gateway` contém `"STRIPE"` → `<StripePaymentForm>` com `<Elements>` + `<PaymentElement>`
+- Se `gateway` contém `"MISTIC"` ou `"PIX"` → `<PixPaymentForm>` com QR Code
 
 ---
 
 ## Variáveis de Ambiente
 
-| Variável | Tipo | Descrição |
-|----------|------|-----------|
-| `NEXT_PUBLIC_API_URL` | `string` | URL base da API de produção (ex: `https://api.xpayments.digital`). Se omitido, usa mock APIs locais. |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `string` | Chave publishable do Stripe. Pode também ser devolvida pela API no campo `publishableKey`. |
-| `API_URL` | `string` | URL da API para proxy server-side (usada nas API routes como fallback). |
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `NEXT_PUBLIC_MASTER_API` | **Sim** | URL do Master Backend. Default: `https://api.xpayments.digital` |
+| `NEXT_PUBLIC_STRIPE_KEY` | **Sim** | Stripe publishable key. Usada para inicializar o Stripe.js |
 
-### Exemplo `.env.local`
+### `.env.local`
 
 ```env
-NEXT_PUBLIC_API_URL=https://api.xpayments.digital
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
-API_URL=https://api.xpayments.digital
+NEXT_PUBLIC_MASTER_API="https://api.xpayments.digital"
+NEXT_PUBLIC_STRIPE_KEY="pk_live_TUA_CHAVE_PUBLICA_DA_STRIPE_AQUI"
 ```
+
+> **Vercel:** Adicionar estas variáveis nas Settings do projeto.
 
 ---
 
-## Instalação e Desenvolvimento
-
-### Pré-requisitos
-
-- **Bun** (recomendado) ou **Node.js** >= 18
-- **Git**
-
-### Setup
+## Instalação
 
 ```bash
-# Clonar o repositório
 git clone https://github.com/nexflowx-hub/checkout.xpayments.digital.git
 cd checkout.xpayments.digital
-
-# Instalar dependências
 bun install
-
-# Iniciar em modo desenvolvimento
 bun run dev
 ```
-
-A aplicação fica disponível em `http://localhost:3000`.
 
 ### Scripts
 
 | Comando | Descrição |
 |---------|-----------|
-| `bun run dev` | Servidor de desenvolvimento (Turbopack) na porta 3000 |
-| `bun run build` | Build de produção (standalone output) |
+| `bun run dev` | Dev server (Turbopack) na porta 3000 |
+| `bun run build` | Build de produção (standalone) |
 | `bun run start` | Servir build de produção |
-| `bun run lint` | ESLint (zero errors) |
+| `bun run lint` | ESLint |
 
 ---
 
-## Demonstração
+## Stripe Integration
 
-A homepage (`/`) contém um launcher com 3 cenários de teste:
+O `StripePaymentForm` funciona em duas camadas:
 
-| Link | Loja | Gateway | Moeda | Valor | Cor |
-|------|------|---------|-------|-------|-----|
-| `/pay/demo_eur` | Nike Store | Stripe | EUR | €150.00 | `#111111` |
-| `/pay/demo_brl` | Loja do Brasil | PIX (MISTIC) | BRL | R$89.90 | `#16a34a` |
-| `/pay/demo_red` | Azores Surf School | Stripe | EUR | €45.00 | `#dc2626` |
+1. **Wrapper** — Carrega `loadStripe(NEXT_PUBLIC_STRIPE_KEY)` e configura `<Elements>` com `appearance.colorPrimary` = `brandColor`
+2. **Inner Form** — Usa `useStripe()` + `<PaymentElement layout="tabs" />`, chama `stripe.confirmPayment()` com `return_url` que aponta para `?status=success`
 
-### Testar um código personalizado
-
-A homepage tem um campo "Código Personalizado" que navega para `/pay/{código}`.
+O Master Backend trata da confirmação real via webhook — o frontend apenas redireciona.
 
 ---
 
@@ -276,120 +184,46 @@ A homepage tem um campo "Código Personalizado" que navega para `/pay/{código}`
 
 | Tecnologia | Versão | Uso |
 |-----------|--------|-----|
-| [Next.js](https://nextjs.org/) | 16.1+ | App Router, API Routes, Turbopack |
-| [React](https://react.dev/) | 19 | UI Components |
+| [Next.js](https://nextjs.org/) | 16 | App Router (client components) |
+| [React](https://react.dev/) | 19 | UI |
 | [TypeScript](https://www.typescriptlang.org/) | 5 | Type safety |
-| [Tailwind CSS](https://tailwindcss.com/) | 4 | Utility-first styling |
-| [shadcn/ui](https://ui.shadcn.com/) | New York | Component library (Button, Card, Input, Select, Badge, etc.) |
+| [Tailwind CSS](https://tailwindcss.com/) | 4 | Styling |
+| [shadcn/ui](https://ui.shadcn.com/) | New York | Components |
 | [@stripe/stripe-js](https://stripe.com/docs/stripe-js) | 9.x | Stripe.js loader |
-| [@stripe/react-stripe-js](https://stripe.com/docs/stripe-js/react) | 6.x | React components (Elements, PaymentElement) |
-| [qrcode.react](https://github.com/zpao/qrcode.react) | 4.x | QR Code SVG generation |
-| [Lucide React](https://lucide.dev/) | 0.525+ | Icon library |
-| [Radix UI](https://www.radix-ui.com/) | latest | Headless primitives (via shadcn) |
+| [@stripe/react-stripe-js](https://stripe.com/docs/stripe-js/react) | 6.x | Elements, PaymentElement |
+| [qrcode.react](https://github.com/zpao/qrcode.react) | 4.x | QR Code SVG |
+| [Lucide React](https://lucide.dev/) | 0.525+ | Icons |
 
 ---
 
-## Deploy
+## Deploy (Vercel)
 
-### Vercel (Recomendado)
-
-```bash
-# Instalar Vercel CLI
-bun add -g vercel
-
-# Deploy
-vercel --prod
-```
-
-Variáveis de ambiente a configurar no dashboard da Vercel:
-- `NEXT_PUBLIC_API_URL`
-- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-
-### Docker / Standalone
-
-O `next.config.ts` usa `output: "standalone"`. Para Docker:
-
-```dockerfile
-FROM node:20-alpine AS installer
-WORKDIR /app
-COPY package.json bun.lock ./
-RUN corepack enable && bun install --frozen-lockfile
-
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=installer /app/node_modules ./node_modules
-COPY . .
-RUN corepack enable && bun run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
-
----
-
-## Integração com API de Produção
-
-Quando `NEXT_PUBLIC_API_URL` está definido, o frontend faz pedidos diretamente à API de produção em vez das mock APIs:
-
-```
-Cliente (Browser)                     API de Produção
-      │                                      │
-      ├─ GET /api/v1/payment-links/abc123 ──→│
-      │                                      │
-      ├─ POST /api/v1/checkout/initiate ────→│  (Smart Routing)
-      │                                      │
-      ├─ Stripe: PaymentElement ────────────→│  (stripe.confirmPayment)
-      │                                      │
-      └─ PIX: QR Code + Copy ──────────────→│  (aguarda webhook)
-```
-
-As API routes locais (`/api/*`) servem como **proxy fallback** — se `API_URL` (server-side) estiver definido, elas fazem proxy para a API de produção. Se não, retornam dados mock.
+1. Fazer push para `main`
+2. No Vercel, importar o repositório `checkout.xpayments.digital`
+3. Adicionar variáveis de ambiente:
+   - `NEXT_PUBLIC_MASTER_API` = `https://api.xpayments.digital`
+   - `NEXT_PUBLIC_STRIPE_KEY` = `pk_live_...`
+4. Deploy
 
 ---
 
 ## Segurança
 
-- **Stripe** — O `clientSecret` é usado apenas no client-side via Stripe.js; a chave de API secreta nunca toca o frontend
-- **PIX** — O `pixCode` é gerado server-side e devolvido via API; não há dados sensíveis no frontend
-- **CORS** — A API de produção deve configurar CORS para permitir o domínio `checkout.xpayments.digital`
-- **HTTPS** — Obrigatório em produção (Stripe requer HTTPS)
+- O `clientSecret` do Stripe é usado apenas via Stripe.js — nunca exposto
+- O `pixCode` é gerado server-side pelo Master Backend
+- HTTPS obrigatório (Stripe requirement)
+- O frontend não tem acesso a chaves secretas
 
 ---
 
-## Estrutura de Branding Dinâmico
+## Notas Técnicas
 
-A injeção de cor é feita via **inline styles** para garantir que qualquer cor hex funcione sem necessidade de compilação CSS:
-
-```tsx
-// Botão principal
-<Button style={{ backgroundColor: brandColor, color: "#fff" }}>
-
-// Header
-<header style={{ borderBottomColor: `${brandColor}20` }}>
-
-// Step indicator
-<div style={{ backgroundColor: isActive ? brandColor : "var(--muted)" }}>
-
-// Avatar fallback
-<div style={{ backgroundColor: brandColor }}>
-  {storeName.slice(0, 2).toUpperCase()}
-</div>
-```
+- `amountFiat` é um valor decimal exato (ex: `150.00`). A função `formatCurrency()` formata diretamente sem conversão.
+- O branding é aplicado via **inline styles** para suportar qualquer cor hex sem compilação CSS.
+- O `return_url` do `stripe.confirmPayment()` aponta para a própria página com `?status=success`.
 
 ---
 
 ## Licença
 
 Propriedade da **NexFlowX Hub**. Todos os direitos reservados.
-
----
-
-## Autor
-
-**NexFlowX** — [github.com/nexflowx-hub](https://github.com/nexflowx-hub)

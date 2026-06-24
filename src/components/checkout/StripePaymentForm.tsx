@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { loadStripe, StripeElementsOptions } from "@stripe/stripe-js";
 import {
   Elements,
@@ -34,7 +34,6 @@ function StripeFormInner({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
     if (!stripe || !elements) return;
 
     setIsLoading(true);
@@ -43,7 +42,7 @@ function StripeFormInner({
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/pay/${paymentLink.id}?status=success`,
+        return_url: `${window.location.href}?status=success`,
       },
     });
 
@@ -54,7 +53,6 @@ function StripeFormInner({
         setMessage("Ocorreu um erro inesperado. Tente novamente.");
       }
     } else {
-      // Payment will redirect or the user is on the return_url
       onSuccess();
     }
 
@@ -68,11 +66,7 @@ function StripeFormInner({
           <CreditCard className="h-4 w-4 text-muted-foreground" />
           <p className="text-sm font-medium text-foreground">Dados do Cartão</p>
         </div>
-        <PaymentElement
-          options={{
-            layout: "tabs",
-          }}
-        />
+        <PaymentElement options={{ layout: "tabs" }} />
       </div>
 
       {message && (
@@ -110,7 +104,7 @@ function StripeFormInner({
   );
 }
 
-// ── Wrapper that loads Stripe and provides Elements ──
+// ── Wrapper: loads Stripe.js + provides Elements ──
 
 interface StripePaymentFormProps {
   checkoutData: StripeCheckoutData;
@@ -125,16 +119,13 @@ export function StripePaymentForm({
   paymentLink,
   onSuccess,
 }: StripePaymentFormProps) {
-  const { clientSecret, publishableKey } = checkoutData;
+  const { clientSecret } = checkoutData;
 
   const stripePromise = useMemo(() => {
-    // In production, the publishable key comes from the API or env
-    const key = publishableKey && !publishableKey.startsWith("pk_test_mock")
-      ? publishableKey
-      : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const key = process.env.NEXT_PUBLIC_STRIPE_KEY;
     if (key) return loadStripe(key);
     return null;
-  }, [publishableKey]);
+  }, []);
 
   const options: StripeElementsOptions = useMemo(
     () => ({
@@ -154,7 +145,7 @@ export function StripePaymentForm({
     [clientSecret, brandColor]
   );
 
-  // If no publishable key is available, show a demo notice
+  // Missing key → show setup notice
   if (!stripePromise) {
     return (
       <div className="space-y-4">
@@ -167,22 +158,11 @@ export function StripePaymentForm({
             <CreditCard className="h-6 w-6 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">
-              Stripe Payment Element
-            </p>
+            <p className="text-sm font-medium text-foreground">Stripe Payment Element</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Modo demonstração — configure a <code className="text-xs bg-muted px-1 py-0.5 rounded">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> para ativar o pagamento real.
+              Configure a variável <code className="text-xs bg-muted px-1 py-0.5 rounded">NEXT_PUBLIC_STRIPE_KEY</code> no Vercel para ativar o pagamento real.
             </p>
           </div>
-          <Button
-            type="button"
-            className="w-full h-11 text-sm font-semibold"
-            style={{ backgroundColor: brandColor, color: "#fff" }}
-            onClick={onSuccess}
-          >
-            <Lock className="h-4 w-4" />
-            Simular Pagamento
-          </Button>
         </div>
       </div>
     );

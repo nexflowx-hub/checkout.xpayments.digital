@@ -13,7 +13,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  } from "lucide-react";
+} from "lucide-react";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
 import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
@@ -32,6 +32,9 @@ import {
   isStripeCheckoutData,
   formatCurrency,
 } from "@/types/checkout";
+
+// ── Master Backend URL ──
+const MASTER_API = process.env.NEXT_PUBLIC_MASTER_API || "https://api.xpayments.digital";
 
 // ── Status check from URL query ──
 
@@ -138,7 +141,7 @@ function SuccessScreen({
   );
 }
 
-// ── Error/Cancelled Screen ──
+// ── Error Screen ──
 
 function ErrorScreen({ message }: { message: string }) {
   return (
@@ -207,24 +210,14 @@ export default function CheckoutPage() {
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
-  // PASSO A: Load payment link
+  // PASSO A: Fetch checkout data from Master Backend
   useEffect(() => {
-    async function fetchPaymentLink() {
+    async function fetchCheckoutData() {
       try {
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL ?? "";
-
-        let response;
-
-        if (apiUrl) {
-          // Call the real external API
-          response = await fetch(`${apiUrl}/api/v1/payment-links/${params.urlCode}`);
-        } else {
-          // Use our local mock API
-          response = await fetch(`/api/payment-links/${params.urlCode}`);
-        }
-
-        const json = await response.json();
+        const res = await fetch(
+          `${MASTER_API}/api/v1/payment-links/${params.urlCode}`
+        );
+        const json = await res.json();
 
         if (!json.success) {
           setError(json.error ?? "Link de pagamento não encontrado");
@@ -233,17 +226,17 @@ export default function CheckoutPage() {
 
         setPaymentLink(json.data);
       } catch (err) {
-        console.error("Failed to fetch payment link:", err);
+        console.error("[checkout] Failed to fetch payment link:", err);
         setError("Não foi possível carregar o link de pagamento.");
       } finally {
         setLoading(false);
       }
     }
 
-    fetchPaymentLink();
+    fetchCheckoutData();
   }, [params.urlCode]);
 
-  // PASSO B: Initiate checkout
+  // PASSO B: Initiate payment via Master Backend
   const handleCustomerSubmit = useCallback(
     async (customerDetails: CustomerDetails) => {
       if (!paymentLink) return;
@@ -252,50 +245,32 @@ export default function CheckoutPage() {
       setInitiateError(null);
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+        const res = await fetch(`${MASTER_API}/api/v1/checkout/initiate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storeId: paymentLink.storeId,
+            amountFiat: paymentLink.amountFiat,
+            currency: paymentLink.currency,
+            customerDetails,
+          }),
+        });
 
-        let response;
+        const result: InitiateCheckoutResponse = await res.json();
 
-        if (apiUrl) {
-          response = await fetch(`${apiUrl}/api/v1/checkout/initiate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              storeId: paymentLink.storeId,
-              amountFiat: paymentLink.amountFiat,
-              currency: paymentLink.currency,
-              customerDetails,
-            }),
-          });
-        } else {
-          // Use our local mock API
-          response = await fetch("/api/checkout/initiate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              storeId: paymentLink.storeId,
-              amountFiat: paymentLink.amountFiat,
-              currency: paymentLink.currency,
-              customerDetails,
-            }),
-          });
-        }
-
-        const json: InitiateCheckoutResponse = await response.json();
-
-        if (!json.success) {
+        if (!result.success) {
           setInitiateError(
-            (json as unknown as { error: string }).error ??
+            (result as unknown as { error: string }).error ??
               "Erro ao iniciar checkout"
           );
           return;
         }
 
-        setGateway(json.data.gateway);
-        setCheckoutData(json.data.checkoutData);
+        setGateway(result.data.gateway);
+        setCheckoutData(result.data.checkoutData);
         setStep("payment");
       } catch (err) {
-        console.error("Failed to initiate checkout:", err);
+        console.error("[checkout] Failed to initiate payment:", err);
         setInitiateError("Erro de ligação ao servidor. Tente novamente.");
       } finally {
         setInitiating(false);
@@ -305,8 +280,6 @@ export default function CheckoutPage() {
   );
 
   const handlePaymentSuccess = useCallback(() => {
-    // In a real app this would redirect or poll for status
-    // For demo, we show success inline
     setStep("payment");
     window.history.replaceState(
       null,
@@ -325,14 +298,13 @@ export default function CheckoutPage() {
   // ── Render states ──
 
   if (loading) return <CheckoutSkeleton />;
-
   if (error) return <ErrorScreen message={error} />;
   if (!paymentLink) return <ErrorScreen message="Link não encontrado" />;
 
   const { branding } = paymentLink;
   const brandColor = branding.color || "#111111";
 
-  // If payment returned as success
+  // Payment success screen
   if (paymentStatus === "success") {
     return (
       <div className="min-h-screen flex flex-col">
@@ -353,10 +325,8 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
       <CheckoutHeader branding={branding} brandColor={brandColor} />
 
-      {/* Main Content */}
       <main className="flex-1 px-4 py-6">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left: Order Summary (Desktop) */}
@@ -427,7 +397,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* Step 2: Payment */}
+                {/* Step 2: Payment Gateway */}
                 {step === "payment" && gateway && checkoutData && (
                   <div className="space-y-1">
                     <h2 className="text-lg font-semibold text-foreground">
