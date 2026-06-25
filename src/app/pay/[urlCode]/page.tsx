@@ -17,21 +17,13 @@ import {
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
 import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
-import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
 import { fetchPaymentLink, initiateCheckout } from "@/lib/api-client";
 import type {
   PaymentLinkData,
   CheckoutStep,
   CustomerDetails,
-  GatewayType,
-  CheckoutData,
 } from "@/types/checkout";
-import {
-  isStripeGateway,
-  isPixGateway,
-  isStripeCheckoutData,
-  formatCurrency,
-} from "@/types/checkout";
+import { formatCurrency } from "@/types/checkout";
 
 // ── Status check from URL query ──
 
@@ -190,24 +182,23 @@ function CheckoutSkeleton() {
   );
 }
 
-// ── Main Checkout Page ──
+// ── Main Checkout Page (Dumb UI) ──
 
 export default function CheckoutPage() {
   const params = useParams<{ urlCode: string }>();
   const paymentStatus = usePaymentStatus();
 
-  // State
+  // State — only what the UI needs to render
   const [paymentLink, setPaymentLink] = useState<PaymentLinkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [step, setStep] = useState<CheckoutStep>("customer_details");
-  const [gateway, setGateway] = useState<GatewayType | null>(null);
-  const [checkoutData, setCheckoutData] = useState<CheckoutData | null>(null);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
-  // PASSO A: Fetch checkout data from Master Backend via api-client
+  // PASSO A: Fetch payment link data from Master Backend
   useEffect(() => {
     fetchPaymentLink(params.urlCode)
       .then(setPaymentLink)
@@ -218,7 +209,7 @@ export default function CheckoutPage() {
       .finally(() => setLoading(false));
   }, [params.urlCode]);
 
-  // PASSO B: Initiate payment via Master Backend via api-client
+  // PASSO B: Submit customer details → get clientSecret from Master Backend
   const handleCustomerSubmit = useCallback(
     async (customerDetails: CustomerDetails) => {
       if (!paymentLink) return;
@@ -234,9 +225,18 @@ export default function CheckoutPage() {
           customerDetails
         );
 
-        setGateway(result.gateway);
-        setCheckoutData(result.checkoutData);
-        setStep("payment");
+        // Extract clientSecret from the gateway response
+        const cs =
+          result.checkoutData && "clientSecret" in result.checkoutData
+            ? (result.checkoutData as { clientSecret: string }).clientSecret
+            : null;
+
+        if (cs) {
+          setClientSecret(cs);
+          setStep("payment");
+        } else {
+          setInitiateError("Gateway de pagamento não suportado ou sem clientSecret.");
+        }
       } catch (err) {
         console.error("[checkout] Failed to initiate payment:", err);
         setInitiateError(
@@ -251,19 +251,9 @@ export default function CheckoutPage() {
     [paymentLink]
   );
 
-  const handlePaymentSuccess = useCallback(() => {
-    setStep("payment");
-    window.history.replaceState(
-      null,
-      "",
-      `/pay/${params.urlCode}?status=success`
-    );
-  }, [params.urlCode]);
-
   const handleGoBack = useCallback(() => {
     setStep("customer_details");
-    setGateway(null);
-    setCheckoutData(null);
+    setClientSecret(null);
     setInitiateError(null);
   }, []);
 
@@ -294,6 +284,11 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
+  // Compute returnUrl for Stripe redirect
+  const returnUrl =
+    branding.successUrl ||
+    `${window.location.origin}/pay/${params.urlCode}?status=success`;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -369,16 +364,14 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* Step 2: Payment Gateway */}
-                {step === "payment" && gateway && checkoutData && (
+                {/* Step 2: Stripe Payment */}
+                {step === "payment" && (
                   <div className="space-y-1">
                     <h2 className="text-lg font-semibold text-foreground">
                       Pagamento
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                      {isStripeGateway(gateway)
-                        ? "Introduza os dados do seu cartão."
-                        : "Escaneie o QR Code ou copie o código PIX."}
+                      Introduza os dados do seu cartão.
                     </p>
                     <div className="pt-4">
                       {initiating ? (
@@ -388,22 +381,14 @@ export default function CheckoutPage() {
                             A preparar o pagamento...
                           </p>
                         </div>
-                      ) : isStripeGateway(gateway) && isStripeCheckoutData(checkoutData) ? (
+                      ) : clientSecret ? (
                         <StripePaymentForm
-                          checkoutData={checkoutData}
+                          clientSecret={clientSecret}
+                          returnUrl={returnUrl}
                           brandColor={brandColor}
-                          paymentLink={paymentLink}
-                          onSuccess={handlePaymentSuccess}
-                        />
-                      ) : isPixGateway(gateway) ? (
-                        <PixPaymentForm
-                          checkoutData={checkoutData as import("@/types/checkout").PixCheckoutData}
-                          brandColor={brandColor}
-                          paymentLink={paymentLink}
-                          onSuccess={handlePaymentSuccess}
                         />
                       ) : (
-                        <ErrorScreen message="Gateway de pagamento não suportado." />
+                        <ErrorScreen message="Dados de pagamento não recebidos." />
                       )}
                     </div>
                   </div>

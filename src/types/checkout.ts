@@ -4,6 +4,7 @@ export interface Branding {
   storeName: string;
   logo?: string;
   color: string;
+  successUrl?: string;
 }
 
 export interface PaymentLinkData {

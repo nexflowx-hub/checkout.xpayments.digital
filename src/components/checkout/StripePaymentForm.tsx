@@ -10,23 +10,16 @@ import {
 } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, CreditCard } from "lucide-react";
-import type { StripeCheckoutData, PaymentLinkData } from "@/types/checkout";
+
+// ── Module-level Stripe.js promise ──
+
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
+);
 
 // ── Inner form that uses Stripe hooks ──
 
-interface StripeFormInnerProps {
-  clientSecret: string;
-  brandColor: string;
-  paymentLink: PaymentLinkData;
-  onSuccess: () => void;
-}
-
-function StripeFormInner({
-  clientSecret,
-  brandColor,
-  paymentLink,
-  onSuccess,
-}: StripeFormInnerProps) {
+function CheckoutForm({ returnUrl }: { returnUrl: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +35,7 @@ function StripeFormInner({
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/pay/${paymentLink.id}?status=success`,
+        return_url: returnUrl,
       },
     });
 
@@ -52,9 +45,8 @@ function StripeFormInner({
       } else {
         setMessage("Ocorreu um erro inesperado. Tente novamente.");
       }
-    } else {
-      onSuccess();
     }
+    // On success, Stripe redirects to returnUrl automatically
 
     setIsLoading(false);
   }
@@ -78,7 +70,6 @@ function StripeFormInner({
       <Button
         type="submit"
         className="w-full h-11 text-sm font-semibold"
-        style={{ backgroundColor: brandColor, color: "#fff" }}
         disabled={!stripe || !elements || isLoading}
       >
         {isLoading ? (
@@ -104,61 +95,58 @@ function StripeFormInner({
   );
 }
 
-// ── Wrapper: loads Stripe.js + provides Elements ──
+// ── Wrapper: provides Elements context ──
 
 interface StripePaymentFormProps {
-  checkoutData: StripeCheckoutData;
-  brandColor: string;
-  paymentLink: PaymentLinkData;
-  onSuccess: () => void;
+  clientSecret: string;
+  returnUrl: string;
+  brandColor?: string;
 }
 
 export function StripePaymentForm({
-  checkoutData,
+  clientSecret,
+  returnUrl,
   brandColor,
-  paymentLink,
-  onSuccess,
 }: StripePaymentFormProps) {
-  const { clientSecret } = checkoutData;
-
-  const stripePromise = useMemo(() => {
-    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-    if (key) return loadStripe(key);
-    return null;
-  }, []);
-
   const options: StripeElementsOptions = useMemo(
     () => ({
       clientSecret,
-      appearance: {
-        theme: "stripe",
-        variables: {
-          colorPrimary: brandColor,
-          colorBackground: "#ffffff",
-          colorText: "#1a1a1a",
-          colorDanger: "#ef4444",
-          fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-          borderRadius: "8px",
-        },
-      },
+      appearance: brandColor
+        ? {
+            theme: "stripe",
+            variables: {
+              colorPrimary: brandColor,
+              colorBackground: "#ffffff",
+              colorText: "#1a1a1a",
+              colorDanger: "#ef4444",
+              fontFamily:
+                "var(--font-geist-sans), system-ui, sans-serif",
+              borderRadius: "8px",
+            },
+          }
+        : undefined,
     }),
     [clientSecret, brandColor]
   );
 
-  // Missing key → show setup notice
-  if (!stripePromise) {
+  // Missing Stripe key → show setup notice
+  if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <CreditCard className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium text-foreground">Dados do Cartão</p>
+          <p className="text-sm font-medium text-foreground">
+            Dados do Cartão
+          </p>
         </div>
         <div className="rounded-lg border bg-muted/30 p-6 text-center space-y-3">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
             <CreditCard className="h-6 w-6 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">Stripe Payment Element</p>
+            <p className="text-sm font-medium text-foreground">
+              Stripe Payment Element
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
               Configure a variável{" "}
               <code className="text-xs bg-muted px-1 py-0.5 rounded">
@@ -174,12 +162,7 @@ export function StripePaymentForm({
 
   return (
     <Elements stripe={stripePromise} options={options}>
-      <StripeFormInner
-        clientSecret={clientSecret}
-        brandColor={brandColor}
-        paymentLink={paymentLink}
-        onSuccess={onSuccess}
-      />
+      <CheckoutForm returnUrl={returnUrl} />
     </Elements>
   );
 }
