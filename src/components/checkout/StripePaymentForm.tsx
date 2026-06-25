@@ -42,7 +42,7 @@ function StripeFormInner({
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.href}?status=success`,
+        return_url: `${window.location.origin}/pay/${paymentLink.id}?status=success`,
       },
     });
 
@@ -122,7 +122,7 @@ export function StripePaymentForm({
   const { clientSecret } = checkoutData;
 
   const stripePromise = useMemo(() => {
-    const key = process.env.NEXT_PUBLIC_STRIPE_KEY;
+    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     if (key) return loadStripe(key);
     return null;
   }, []);
@@ -160,7 +160,11 @@ export function StripePaymentForm({
           <div>
             <p className="text-sm font-medium text-foreground">Stripe Payment Element</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Configure a variável <code className="text-xs bg-muted px-1 py-0.5 rounded">NEXT_PUBLIC_STRIPE_KEY</code> no Vercel para ativar o pagamento real.
+              Configure a variável{" "}
+              <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+              </code>{" "}
+              no Vercel para ativar o pagamento real.
             </p>
           </div>
         </div>

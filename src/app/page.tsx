@@ -96,7 +96,7 @@ export default function Home() {
             <CardContent>
               <div className="space-y-2 text-xs font-mono bg-muted/50 rounded-lg p-4">
                 <p><span className="text-foreground font-semibold">NEXT_PUBLIC_MASTER_API</span>=<span className="text-muted-foreground">&quot;https://api.xpayments.digital&quot;</span></p>
-                <p><span className="text-foreground font-semibold">NEXT_PUBLIC_STRIPE_KEY</span>=<span className="text-muted-foreground">&quot;pk_live_...&quot;</span></p>
+                <p><span className="text-foreground font-semibold">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</span>=<span className="text-muted-foreground">&quot;pk_live_...&quot;</span></p>
               </div>
             </CardContent>
           </Card>

@@ -18,10 +18,10 @@ import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
 import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
 import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
+import { fetchPaymentLink, initiateCheckout } from "@/lib/api-client";
 import type {
   PaymentLinkData,
   CheckoutStep,
-  InitiateCheckoutResponse,
   CustomerDetails,
   GatewayType,
   CheckoutData,
@@ -32,9 +32,6 @@ import {
   isStripeCheckoutData,
   formatCurrency,
 } from "@/types/checkout";
-
-// ── Master Backend URL ──
-const MASTER_API = process.env.NEXT_PUBLIC_MASTER_API || "https://api.xpayments.digital";
 
 // ── Status check from URL query ──
 
@@ -210,33 +207,18 @@ export default function CheckoutPage() {
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
-  // PASSO A: Fetch checkout data from Master Backend
+  // PASSO A: Fetch checkout data from Master Backend via api-client
   useEffect(() => {
-    async function fetchCheckoutData() {
-      try {
-        const res = await fetch(
-          `${MASTER_API}/api/v1/payment-links/${params.urlCode}`
-        );
-        const json = await res.json();
-
-        if (!json.success) {
-          setError(json.error ?? "Link de pagamento não encontrado");
-          return;
-        }
-
-        setPaymentLink(json.data);
-      } catch (err) {
+    fetchPaymentLink(params.urlCode)
+      .then(setPaymentLink)
+      .catch((err) => {
         console.error("[checkout] Failed to fetch payment link:", err);
-        setError("Não foi possível carregar o link de pagamento.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCheckoutData();
+        setError(err.message || "Não foi possível carregar o link de pagamento.");
+      })
+      .finally(() => setLoading(false));
   }, [params.urlCode]);
 
-  // PASSO B: Initiate payment via Master Backend
+  // PASSO B: Initiate payment via Master Backend via api-client
   const handleCustomerSubmit = useCallback(
     async (customerDetails: CustomerDetails) => {
       if (!paymentLink) return;
@@ -245,33 +227,23 @@ export default function CheckoutPage() {
       setInitiateError(null);
 
       try {
-        const res = await fetch(`${MASTER_API}/api/v1/checkout/initiate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storeId: paymentLink.storeId,
-            amountFiat: paymentLink.amountFiat,
-            currency: paymentLink.currency,
-            customerDetails,
-          }),
-        });
+        const result = await initiateCheckout(
+          paymentLink.storeId,
+          paymentLink.amountFiat,
+          paymentLink.currency,
+          customerDetails
+        );
 
-        const result: InitiateCheckoutResponse = await res.json();
-
-        if (!result.success) {
-          setInitiateError(
-            (result as unknown as { error: string }).error ??
-              "Erro ao iniciar checkout"
-          );
-          return;
-        }
-
-        setGateway(result.data.gateway);
-        setCheckoutData(result.data.checkoutData);
+        setGateway(result.gateway);
+        setCheckoutData(result.checkoutData);
         setStep("payment");
       } catch (err) {
         console.error("[checkout] Failed to initiate payment:", err);
-        setInitiateError("Erro de ligação ao servidor. Tente novamente.");
+        setInitiateError(
+          err instanceof Error
+            ? err.message
+            : "Erro de ligação ao servidor. Tente novamente."
+        );
       } finally {
         setInitiating(false);
       }

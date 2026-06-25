@@ -36,6 +36,9 @@ src/
 │   │   ├── StripePaymentForm.tsx             # Step 2: Stripe Elements + PaymentElement
 │   │   └── PixPaymentForm.tsx                # Step 2: QR Code + PIX Copia e Cola
 │   └── ui/                                   # shadcn/ui components
+├── lib/
+│   ├── api-client.ts                         # API Client (fetchPaymentLink + initiateCheckout)
+│   └── utils.ts                              # Utility functions (cn)
 └── types/
     └── checkout.ts                           # TypeScript types + helpers
 ```
@@ -136,13 +139,13 @@ O Master Backend devolve o gateway escolhido (Smart Routing):
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
 | `NEXT_PUBLIC_MASTER_API` | **Sim** | URL do Master Backend. Default: `https://api.xpayments.digital` |
-| `NEXT_PUBLIC_STRIPE_KEY` | **Sim** | Stripe publishable key. Usada para inicializar o Stripe.js |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | **Sim** | Stripe publishable key. Usada para inicializar o Stripe.js |
 
 ### `.env.local`
 
 ```env
 NEXT_PUBLIC_MASTER_API="https://api.xpayments.digital"
-NEXT_PUBLIC_STRIPE_KEY="pk_live_TUA_CHAVE_PUBLICA_DA_STRIPE_AQUI"
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_live_TUA_CHAVE_PUBLICA_AQUI"
 ```
 
 > **Vercel:** Adicionar estas variáveis nas Settings do projeto.
@@ -173,7 +176,7 @@ bun run dev
 
 O `StripePaymentForm` funciona em duas camadas:
 
-1. **Wrapper** — Carrega `loadStripe(NEXT_PUBLIC_STRIPE_KEY)` e configura `<Elements>` com `appearance.colorPrimary` = `brandColor`
+1. **Wrapper** — Carrega `loadStripe(NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)` e configura `<Elements>` com `appearance.colorPrimary` = `brandColor`
 2. **Inner Form** — Usa `useStripe()` + `<PaymentElement layout="tabs" />`, chama `stripe.confirmPayment()` com `return_url` que aponta para `?status=success`
 
 O Master Backend trata da confirmação real via webhook — o frontend apenas redireciona.
@@ -202,7 +205,7 @@ O Master Backend trata da confirmação real via webhook — o frontend apenas r
 2. No Vercel, importar o repositório `checkout.xpayments.digital`
 3. Adicionar variáveis de ambiente:
    - `NEXT_PUBLIC_MASTER_API` = `https://api.xpayments.digital`
-   - `NEXT_PUBLIC_STRIPE_KEY` = `pk_live_...`
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` = `pk_live_...`
 4. Deploy
 
 ---
@@ -218,7 +221,7 @@ O Master Backend trata da confirmação real via webhook — o frontend apenas r
 
 ## Notas Técnicas
 
-- `amountFiat` é um valor decimal exato (ex: `150.00`). A função `formatCurrency()` formata diretamente sem conversão.
+- `amountFiat` é um valor decimal exato (ex: `150.00`). A função `formatCurrency()` formata diretamente sem divisão por centavos.
 - O branding é aplicado via **inline styles** para suportar qualquer cor hex sem compilação CSS.
 - O `return_url` do `stripe.confirmPayment()` aponta para a própria página com `?status=success`.
 
