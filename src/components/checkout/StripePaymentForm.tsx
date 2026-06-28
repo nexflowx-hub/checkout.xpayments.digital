@@ -8,14 +8,12 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Lock, CreditCard, AlertTriangle, Wallet, Shield } from "lucide-react";
 import { StripeErrorBoundary } from "@/components/checkout/StripeErrorBoundary";
-
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
-);
+import { useI18n } from "@/lib/i18n";
 
 // ── Inner Stripe Checkout Form ──
 
@@ -28,6 +26,7 @@ function StripeCheckoutForm({
   amount: string;
   brandColor?: string;
 }) {
+  const { t } = useI18n();
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setIsLoading] = useState(false);
@@ -48,8 +47,8 @@ function StripeCheckoutForm({
     if (error) {
       setMessage(
         error.type === "card_error" || error.type === "validation_error"
-          ? error.message ?? "Erro no cartão"
-          : "Ocorreu um erro inesperado. Tente novamente."
+          ? error.message ?? "Card error"
+          : "An unexpected error occurred. Please try again."
       );
     }
 
@@ -75,12 +74,12 @@ function StripeCheckoutForm({
         {isLoading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            A processar pagamento...
+            {t("stripe.processing")}
           </>
         ) : (
           <>
             <Lock className="h-4 w-4" />
-            Pagar agora — {amount}
+            {t("stripe.payNow")} — {amount}
           </>
         )}
       </Button>
@@ -88,7 +87,7 @@ function StripeCheckoutForm({
       <div className="flex items-center justify-center gap-2 pt-1">
         <Shield className="h-3 w-3 text-muted-foreground" />
         <p className="text-[11px] text-muted-foreground">
-          Pagamento encriptado via Stripe
+          {t("stripe.encrypted")}
         </p>
       </div>
     </form>
@@ -98,6 +97,8 @@ function StripeCheckoutForm({
 // ── Web3 / Crypto Placeholder ──
 
 function Web3Placeholder({ brandColor }: { brandColor?: string }) {
+  const { t } = useI18n();
+
   return (
     <div className="py-10 sm:py-14 flex flex-col items-center text-center space-y-4">
       {/* Glow icon */}
@@ -106,7 +107,7 @@ function Web3Placeholder({ brandColor }: { brandColor?: string }) {
         style={{
           backgroundColor: brandColor
             ? `${brandColor}12`
-            : "rgba(255,255,255,0.04)",
+            : "var(--muted, rgba(0,0,0,0.04))",
         }}
       >
         <Wallet
@@ -124,12 +125,10 @@ function Web3Placeholder({ brandColor }: { brandColor?: string }) {
 
       <div className="space-y-1.5">
         <p className="text-sm font-semibold text-foreground">
-          Pagamento Web3
+          {t("stripe.web3Title")}
         </p>
-        <p className="text-xs text-muted-foreground leading-relaxed max-w-[260px]">
-          Em breve poderá pagar com criptomoedas.
-          <br />
-          Conecte a sua Wallet Metamask.
+        <p className="text-xs text-muted-foreground leading-relaxed max-w-[260px] whitespace-pre-line">
+          {t("stripe.web3Subtitle")}
         </p>
       </div>
 
@@ -142,7 +141,7 @@ function Web3Placeholder({ brandColor }: { brandColor?: string }) {
           Metamask
         </span>
         <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider ml-1">
-          Em breve
+          {t("stripe.web3ComingSoon")}
         </span>
       </div>
     </div>
@@ -152,19 +151,19 @@ function Web3Placeholder({ brandColor }: { brandColor?: string }) {
 // ── Fallbacks ──
 
 function StripeKeyMissing() {
+  const { t } = useI18n();
+
   return (
     <div className="py-10 text-center space-y-3">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
         <CreditCard className="h-6 w-6 text-muted-foreground" />
       </div>
       <div>
-        <p className="text-sm font-medium text-foreground">Stripe Payment Element</p>
+        <p className="text-sm font-medium text-foreground">
+          {t("stripe.keyMissing")}
+        </p>
         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-          Configure a variável{" "}
-          <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">
-            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-          </code>{" "}
-          no ambiente de deploy.
+          {t("stripe.keyMissingDesc")}
         </p>
       </div>
     </div>
@@ -172,6 +171,8 @@ function StripeKeyMissing() {
 }
 
 function StripeCrashFallback() {
+  const { t } = useI18n();
+
   return (
     <div className="py-10 text-center space-y-3">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
@@ -179,11 +180,10 @@ function StripeCrashFallback() {
       </div>
       <div>
         <p className="text-sm font-medium text-foreground">
-          Aguardando configuração do Gateway pelo Lojista
+          {t("stripe.crashTitle")}
         </p>
-        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-          O Stripe não conseguiu inicializar o pagamento.
-          Tente novamente mais tarde.
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed whitespace-pre-line">
+          {t("stripe.crashDesc")}
         </p>
       </div>
     </div>
@@ -194,6 +194,7 @@ function StripeCrashFallback() {
 
 interface StripePaymentFormProps {
   clientSecret: string;
+  publicKey: string;
   returnUrl: string;
   brandColor?: string;
   amount?: string;
@@ -201,55 +202,73 @@ interface StripePaymentFormProps {
 
 export function StripePaymentForm({
   clientSecret,
+  publicKey,
   returnUrl,
   brandColor,
   amount = "",
 }: StripePaymentFormProps) {
+  const { resolvedTheme } = useTheme();
+  const { t } = useI18n();
+  const isDark = resolvedTheme === "dark";
+
+  // Dynamic Stripe initialization from backend-provided publicKey
+  const stripePromise = useMemo(() => {
+    if (!publicKey) return null;
+    return loadStripe(publicKey);
+  }, [publicKey]);
+
+  // Theme-aware Stripe appearance
   const options: StripeElementsOptions = useMemo(
     () => ({
       clientSecret,
       appearance: {
-        theme: "night" as const,
+        theme: isDark ? "night" : "stripe",
         variables: {
           colorPrimary: brandColor || "#6366f1",
-          colorBackground: "#09090b",
-          colorText: "#fafafa",
-          colorTextSecondary: "#a1a1aa",
+          colorBackground: isDark ? "#09090b" : "#ffffff",
+          colorText: isDark ? "#fafafa" : "#1a1a1a",
+          colorTextSecondary: isDark ? "#a1a1aa" : "#6b7280",
           colorDanger: "#ef4444",
           fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
           borderRadius: "8px",
           spacingBranding: "none",
         },
-        rules: {
-          ".Label": { color: "#a1a1aa", fontSize: "12px", fontWeight: "500" },
-          ".Input": { backgroundColor: "#09090b", borderColor: "#27272a" },
-          ".Input:focus": { borderColor: brandColor || "#6366f1" },
-          ".Tab": { color: "#a1a1aa" },
-          ".Tab:hover": { color: "#fafafa" },
-          ".Tab--selected": { color: "#fafafa", borderColor: brandColor || "#6366f1" },
-        },
+        ...(isDark && {
+          rules: {
+            ".Label": { color: "#a1a1aa", fontSize: "12px", fontWeight: "500" },
+            ".Input": { backgroundColor: "#09090b", borderColor: "#27272a" },
+            ".Input:focus": { borderColor: brandColor || "#6366f1" },
+            ".Tab": { color: "#a1a1aa" },
+            ".Tab:hover": { color: "#fafafa" },
+            ".Tab--selected": { color: "#fafafa", borderColor: brandColor || "#6366f1" },
+          },
+        }),
       },
     }),
-    [clientSecret, brandColor]
+    [clientSecret, brandColor, isDark]
   );
 
-  if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+  // Defensive: no publicKey from backend
+  if (!publicKey || !stripePromise) {
     return <StripeKeyMissing />;
   }
 
   return (
     <Tabs defaultValue="card" className="w-full">
       <TabsList className="w-full h-11 bg-muted/50 p-1">
-        <TabsTrigger value="card" className="flex-1 gap-2 h-9 text-xs font-medium data-[state=active]:bg-card">
+        <TabsTrigger
+          value="card"
+          className="flex-1 gap-2 h-9 text-xs font-medium data-[state=active]:bg-card"
+        >
           <CreditCard className="h-3.5 w-3.5" />
-          Cartão / Pagamento
+          {t("stripe.cardTab")}
         </TabsTrigger>
         <TabsTrigger
           value="web3"
           className="flex-1 gap-2 h-9 text-xs font-medium data-[state=active]:bg-card opacity-60 pointer-events-none select-none"
         >
           <Wallet className="h-3.5 w-3.5" />
-          Web3 / Crypto
+          {t("stripe.web3Tab")}
         </TabsTrigger>
       </TabsList>
 

@@ -13,37 +13,20 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowRight, User, Mail, Phone, MapPin, Home } from "lucide-react";
 import type { CustomerDetails } from "@/types/checkout";
-import { detectCountry } from "@/types/checkout";
+import { useI18n, COUNTRIES, detectCountryCode } from "@/lib/i18n";
 
 interface CustomerDetailsFormProps {
   onSubmit: (details: CustomerDetails) => Promise<void>;
   brandColor: string;
 }
 
-const COUNTRIES = [
-  { value: "PT", label: "Portugal" },
-  { value: "BR", label: "Brasil" },
-  { value: "ES", label: "Espanha" },
-  { value: "FR", label: "França" },
-  { value: "DE", label: "Alemanha" },
-  { value: "IT", label: "Itália" },
-  { value: "GB", label: "Reino Unido" },
-  { value: "US", label: "Estados Unidos" },
-  { value: "AO", label: "Angola" },
-  { value: "MZ", label: "Moçambique" },
-  { value: "CV", label: "Cabo Verde" },
-  { value: "CH", label: "Suíça" },
-  { value: "NL", label: "Holanda" },
-  { value: "BE", label: "Bélgica" },
-  { value: "IE", label: "Irlanda" },
-  { value: "LU", label: "Luxemburgo" },
-  { value: "OTHER", label: "Outro" },
-];
-
 export function CustomerDetailsForm({
   onSubmit,
   brandColor,
 }: CustomerDetailsFormProps) {
+  const { t, locale } = useI18n();
+  const countries = COUNTRIES[locale] ?? COUNTRIES.pt;
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -54,28 +37,49 @@ export function CustomerDetailsForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Auto-detect country on mount
+  // Track whether user has manually changed the country
+  const [countryTouched, setCountryTouched] = useState(false);
+
+  // Auto-detect country on mount using shared utility
   useEffect(() => {
-    setCountry(detectCountry());
+    if (!country) {
+      setCountry(detectCountryCode());
+    }
   }, []);
+
+  // When user manually picks a country, mark as touched
+  function handleCountryChange(val: string) {
+    setCountryTouched(true);
+    setCountry(val);
+  }
+
+  // When locale changes and user hasn't manually set country, re-suggest
+  useEffect(() => {
+    if (!countryTouched && country) {
+      const suggested = detectCountryCode();
+      if (suggested !== country) {
+        setCountry(suggested);
+      }
+    }
+  }, [locale]);
 
   function validate(): boolean {
     const newErrors: Record<string, string> = {};
 
     if (!fullName.trim()) {
-      newErrors.fullName = "Nome completo é obrigatório";
+      newErrors.fullName = t("form.fullNameRequired");
     } else if (fullName.trim().length < 2) {
-      newErrors.fullName = "Mínimo 2 caracteres";
+      newErrors.fullName = t("form.fullNameMin");
     }
 
     if (!email.trim()) {
-      newErrors.email = "Email é obrigatório";
+      newErrors.email = t("form.emailRequired");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Email inválido";
+      newErrors.email = t("form.emailInvalid");
     }
 
     if (!country) {
-      newErrors.country = "Selecione o país";
+      newErrors.country = t("form.countryRequired");
     }
 
     setErrors(newErrors);
@@ -107,14 +111,14 @@ export function CustomerDetailsForm({
       {/* Full Name */}
       <div className="space-y-1.5">
         <Label htmlFor="fullName" className="text-xs font-medium text-muted-foreground">
-          Nome Completo <span className="text-destructive">*</span>
+          {t("form.fullName")} <span className="text-destructive">*</span>
         </Label>
         <div className="relative">
           <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="fullName"
             type="text"
-            placeholder="João Silva"
+            placeholder={t("form.fullNamePlaceholder")}
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             className="pl-10 h-11"
@@ -130,14 +134,14 @@ export function CustomerDetailsForm({
       {/* Email */}
       <div className="space-y-1.5">
         <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">
-          Email <span className="text-destructive">*</span>
+          {t("form.email")} <span className="text-destructive">*</span>
         </Label>
         <div className="relative">
           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="email"
             type="email"
-            placeholder="joao@email.com"
+            placeholder={t("form.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="pl-10 h-11"
@@ -154,14 +158,14 @@ export function CustomerDetailsForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="phone" className="text-xs font-medium text-muted-foreground">
-            Telefone
+            {t("form.phone")}
           </Label>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="phone"
               type="tel"
-              placeholder="+351 912 345 678"
+              placeholder={t("form.phonePlaceholder")}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="pl-10 h-11"
@@ -172,16 +176,16 @@ export function CustomerDetailsForm({
 
         <div className="space-y-1.5">
           <Label htmlFor="country" className="text-xs font-medium text-muted-foreground">
-            País <span className="text-destructive">*</span>
+            {t("form.country")} <span className="text-destructive">*</span>
           </Label>
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-            <Select value={country} onValueChange={setCountry} disabled={isSubmitting}>
+            <Select value={country} onValueChange={handleCountryChange} disabled={isSubmitting}>
               <SelectTrigger className="pl-10 h-11 w-full">
-                <SelectValue placeholder="Selecione o país" />
+                <SelectValue placeholder={t("form.countryRequired")} />
               </SelectTrigger>
               <SelectContent>
-                {COUNTRIES.map((c) => (
+                {countries.map((c) => (
                   <SelectItem key={c.value} value={c.value}>
                     {c.label}
                   </SelectItem>
@@ -198,14 +202,14 @@ export function CustomerDetailsForm({
       {/* Address */}
       <div className="space-y-1.5">
         <Label htmlFor="address" className="text-xs font-medium text-muted-foreground">
-          Morada
+          {t("form.address")}
         </Label>
         <div className="relative">
           <Home className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
             id="address"
             type="text"
-            placeholder="Rua, Número, Andar"
+            placeholder={t("form.addressPlaceholder")}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             className="pl-10 h-11"
@@ -218,12 +222,12 @@ export function CustomerDetailsForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="postalCode" className="text-xs font-medium text-muted-foreground">
-            Código Postal
+            {t("form.postalCode")}
           </Label>
           <Input
             id="postalCode"
             type="text"
-            placeholder="1000-001"
+            placeholder={t("form.postalCodePlaceholder")}
             value={postalCode}
             onChange={(e) => setPostalCode(e.target.value)}
             className="h-11"
@@ -232,12 +236,12 @@ export function CustomerDetailsForm({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="city" className="text-xs font-medium text-muted-foreground">
-            Cidade
+            {t("form.city")}
           </Label>
           <Input
             id="city"
             type="text"
-            placeholder="Lisboa"
+            placeholder={t("form.cityPlaceholder")}
             value={city}
             onChange={(e) => setCity(e.target.value)}
             className="h-11"
@@ -256,21 +260,25 @@ export function CustomerDetailsForm({
         {isSubmitting ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            A processar...
+            {t("form.processing")}
           </>
         ) : (
           <>
-            Continuar para Pagamento
+            {t("form.submit")}
             <ArrowRight className="h-4 w-4" />
           </>
         )}
       </Button>
 
       <p className="text-[11px] text-center text-muted-foreground mt-2 leading-relaxed">
-        Ao continuar, concorda com os{" "}
-        <span className="underline cursor-pointer hover:text-foreground transition-colors">Termos de Serviço</span>
-        {" "}e{" "}
-        <span className="underline cursor-pointer hover:text-foreground transition-colors">Política de Privacidade</span>
+        {t("form.terms")}{" "}
+        <span className="underline cursor-pointer hover:text-foreground transition-colors">
+          {t("form.termsService")}
+        </span>
+        {" "}{t("form.termsAnd")}{" "}
+        <span className="underline cursor-pointer hover:text-foreground transition-colors">
+          {t("form.privacyPolicy")}
+        </span>
       </p>
     </form>
   );

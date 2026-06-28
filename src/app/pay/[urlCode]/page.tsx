@@ -18,6 +18,9 @@ import { OrderSummary, CompactOrderSummary } from "@/components/checkout/OrderSu
 import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
 import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
 import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
+import { ThemeToggle } from "@/components/checkout/ThemeToggle";
+import { LanguageSelector } from "@/components/checkout/LanguageSelector";
+import { I18nProvider, useI18n } from "@/lib/i18n";
 import { fetchPaymentLink, initiateCheckout } from "@/lib/api-client";
 import type {
   PaymentLinkData,
@@ -51,12 +54,39 @@ interface CheckoutResult {
   checkoutData: CheckoutData;
 }
 
+// ── Minimal Header (no branding data needed) ──
+
+function MinimalHeader() {
+  return (
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-md bg-foreground flex items-center justify-center">
+            <span className="text-background font-bold text-[10px] sm:text-xs">XP</span>
+          </div>
+          <span className="font-semibold text-xs sm:text-sm text-foreground">
+            XPayments
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <LanguageSelector />
+          <ThemeToggle />
+          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground shrink-0 ml-1">
+            <ShieldCheck className="h-3 w-3" />
+            <span className="hidden sm:inline">Secure</span>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 // ── Loading Skeleton ──
 
 function CheckoutSkeleton() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="p-4"><Skeleton className="h-5 w-28" /></div>
+    <div className="min-h-screen flex flex-col bg-background">
+      <MinimalHeader />
       <div className="flex-1 max-w-5xl mx-auto w-full px-4 pb-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
@@ -91,6 +121,8 @@ function SuccessScreen({
   brandColor: string;
   storeName: string;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="text-center space-y-5 max-w-sm w-full">
@@ -101,14 +133,15 @@ function SuccessScreen({
           <CheckCircle2 className="h-8 w-8" style={{ color: brandColor }} />
         </div>
         <div className="space-y-2">
-          <h1 className="text-xl font-bold text-foreground">Pagamento Confirmado!</h1>
+          <h1 className="text-xl font-bold text-foreground">
+            {t("success.title")}
+          </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Obrigado pela sua compra em <span className="text-foreground font-medium">{storeName}</span>.
+            {t("success.thanks")}{" "}
+            <span className="text-foreground font-medium">{storeName}</span>.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Enviámos um email de confirmação com os detalhes do pedido.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("success.email")}</p>
       </div>
     </div>
   );
@@ -117,24 +150,33 @@ function SuccessScreen({
 // ── Error Screen ──
 
 function ErrorScreen({ message }: { message: string }) {
+  const { t } = useI18n();
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="text-center space-y-5 max-w-sm w-full">
-        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-destructive/10">
-          <XCircle className="h-8 w-8 text-destructive" />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-xl font-bold text-foreground">Ops!</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">{message}</p>
+    <div className="min-h-screen flex flex-col bg-background">
+      <MinimalHeader />
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div className="text-center space-y-5 max-w-sm w-full">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-destructive/10">
+            <XCircle className="h-8 w-8 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-xl font-bold text-foreground">{t("error.title")}</h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {message}
+            </p>
+          </div>
         </div>
       </div>
+      <CheckoutFooter />
     </div>
   );
 }
 
-// ── Main Checkout Page ──
+// ── Main Checkout Page (inner, uses I18n context) ──
 
-export default function CheckoutPage() {
+function CheckoutPageInner() {
+  const { t } = useI18n();
   const params = useParams<{ urlCode: string }>();
   const paymentStatus = usePaymentStatus();
 
@@ -154,10 +196,10 @@ export default function CheckoutPage() {
       .then(setPaymentLink)
       .catch((err) => {
         console.error("[checkout] fetch error:", err);
-        setError(err.message || "Não foi possível carregar o link de pagamento.");
+        setError(err.message || t("error.loadFailed"));
       })
       .finally(() => setLoading(false));
-  }, [params.urlCode]);
+  }, [params.urlCode, t]);
 
   // Submit customer details
   const handleCustomerSubmit = useCallback(
@@ -178,15 +220,13 @@ export default function CheckoutPage() {
       } catch (err) {
         console.error("[checkout] initiate error:", err);
         setInitiateError(
-          err instanceof Error
-            ? err.message
-            : "Erro de ligação ao servidor. Tente novamente."
+          err instanceof Error ? err.message : t("error.serverError")
         );
       } finally {
         setInitiating(false);
       }
     },
-    [paymentLink]
+    [paymentLink, t]
   );
 
   const handleGoBack = useCallback(() => {
@@ -203,7 +243,7 @@ export default function CheckoutPage() {
 
   if (loading) return <CheckoutSkeleton />;
   if (error) return <ErrorScreen message={error} />;
-  if (!paymentLink) return <ErrorScreen message="Link não encontrado" />;
+  if (!paymentLink) return <ErrorScreen message={t("error.notFound")} />;
 
   const { branding } = paymentLink;
   const brandColor = branding.color || "#111111";
@@ -211,9 +251,11 @@ export default function CheckoutPage() {
   // Success screen
   if (paymentStatus === "success") {
     return (
-      <div className="dark min-h-screen bg-[#09090b]">
+      <div className="min-h-screen flex flex-col bg-background">
         <CheckoutHeader branding={branding} brandColor={brandColor} />
-        <SuccessScreen brandColor={brandColor} storeName={branding.storeName} />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <SuccessScreen brandColor={brandColor} storeName={branding.storeName} />
+        </main>
         <CheckoutFooter />
       </div>
     );
@@ -223,12 +265,14 @@ export default function CheckoutPage() {
   const gateway = checkoutResult?.gateway ?? "";
   const isStripe = isStripeGateway(gateway);
   const isPix = isPixGateway(gateway);
-  const stripeData = checkoutResult && isStripeCheckoutData(checkoutResult.checkoutData)
-    ? checkoutResult.checkoutData
-    : null;
-  const pixData = checkoutResult && isPixCheckoutData(checkoutResult.checkoutData)
-    ? checkoutResult.checkoutData
-    : null;
+  const stripeData =
+    checkoutResult && isStripeCheckoutData(checkoutResult.checkoutData)
+      ? checkoutResult.checkoutData
+      : null;
+  const pixData =
+    checkoutResult && isPixCheckoutData(checkoutResult.checkoutData)
+      ? checkoutResult.checkoutData
+      : null;
 
   const returnUrl =
     branding.successUrl ||
@@ -239,7 +283,7 @@ export default function CheckoutPage() {
   // ── STEP 1: Lead Capture ──
   if (step === "customer_details") {
     return (
-      <div className="dark min-h-screen flex flex-col bg-[#09090b]">
+      <div className="min-h-screen flex flex-col bg-background">
         <CheckoutHeader branding={branding} brandColor={brandColor} />
 
         <main className="flex-1 px-3 sm:px-4 py-4 sm:py-8">
@@ -256,15 +300,18 @@ export default function CheckoutPage() {
               <div className="rounded-xl border border-border/50 bg-card p-5 sm:p-6 lg:p-8">
                 {/* Mobile order summary */}
                 <div className="lg:hidden mb-6 p-4 rounded-lg bg-muted/30 border border-border/30">
-                  <CompactOrderSummary paymentLink={paymentLink} brandColor={brandColor} />
+                  <CompactOrderSummary
+                    paymentLink={paymentLink}
+                    brandColor={brandColor}
+                  />
                 </div>
 
                 <div className="space-y-1 mb-6">
                   <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-                    Informações de Contacto
+                    {t("step1.title")}
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Insira os seus dados para prosseguir.
+                    {t("step1.subtitle")}
                   </p>
                 </div>
 
@@ -290,15 +337,23 @@ export default function CheckoutPage() {
 
   // ── STEP 2: Payment ──
   return (
-    <div className="dark min-h-screen flex flex-col bg-[#09090b]">
-      <CheckoutHeader branding={branding} brandColor={brandColor} onBack={handleGoBack} showBack />
+    <div className="min-h-screen flex flex-col bg-background">
+      <CheckoutHeader
+        branding={branding}
+        brandColor={brandColor}
+        onBack={handleGoBack}
+        showBack
+      />
 
       <main className="flex-1 px-3 sm:px-4 py-4 sm:py-8">
         <div className="max-w-2xl mx-auto w-full">
           <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
             {/* Compact order bar */}
             <div className="px-5 sm:px-6 py-4 border-b border-border/50 bg-muted/20">
-              <CompactOrderSummary paymentLink={paymentLink} brandColor={brandColor} />
+              <CompactOrderSummary
+                paymentLink={paymentLink}
+                brandColor={brandColor}
+              />
             </div>
 
             <div className="p-5 sm:p-6 lg:p-8">
@@ -321,12 +376,12 @@ export default function CheckoutPage() {
                 )}
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    {isPix ? "Pagamento PIX" : "Pagamento"}
+                    {isPix ? t("step2.pix.title") : t("step2.stripe.title")}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {isPix
-                      ? "Escaneie o QR Code ou copie o código."
-                      : "Cartão, MBWay, Multibanco e outros métodos."}
+                      ? t("step2.pix.subtitle")
+                      : t("step2.stripe.subtitle")}
                   </p>
                 </div>
               </div>
@@ -337,11 +392,14 @@ export default function CheckoutPage() {
               {initiating ? (
                 <div className="flex flex-col items-center justify-center py-14 space-y-3">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">A preparar o pagamento...</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t("step2.preparing")}
+                  </p>
                 </div>
               ) : isStripe && stripeData ? (
                 <StripePaymentForm
                   clientSecret={stripeData.clientSecret}
+                  publicKey={stripeData.publicKey}
                   returnUrl={returnUrl}
                   brandColor={brandColor}
                   amount={amountStr}
@@ -354,7 +412,7 @@ export default function CheckoutPage() {
                   onSuccess={handlePixSuccess}
                 />
               ) : (
-                <ErrorScreen message="Gateway de pagamento não suportado." />
+                <ErrorScreen message={t("step2.unsupported")} />
               )}
             </div>
           </div>
@@ -363,6 +421,16 @@ export default function CheckoutPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+// ── Exported Page with I18n Provider ──
+
+export default function CheckoutPage() {
+  return (
+    <I18nProvider>
+      <CheckoutPageInner />
+    </I18nProvider>
   );
 }
 
@@ -379,8 +447,10 @@ function CheckoutHeader({
   onBack?: () => void;
   showBack?: boolean;
 }) {
+  const { t } = useI18n();
+
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#09090b]/80 border-b border-border/40">
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
           {showBack && onBack && (
@@ -413,9 +483,21 @@ function CheckoutHeader({
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground shrink-0">
-          <ShieldCheck className="h-3 w-3" />
-          <span className="hidden sm:inline">Checkout</span> Seguro
+
+        <div className="flex items-center gap-1">
+          {/* Language selector */}
+          <LanguageSelector />
+
+          {/* Theme toggle */}
+          <ThemeToggle />
+
+          {/* Secure badge */}
+          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground shrink-0 ml-1">
+            <ShieldCheck className="h-3 w-3" />
+            <span className="hidden sm:inline">
+              {t("header.secure")}
+            </span>
+          </div>
         </div>
       </div>
     </header>
@@ -423,10 +505,14 @@ function CheckoutHeader({
 }
 
 function CheckoutFooter() {
+  const { t } = useI18n();
+
   return (
     <div className="flex items-center justify-center gap-1.5 pt-6 pb-2 text-[11px] text-muted-foreground/60">
-      <span>Powered by</span>
-      <span className="font-semibold text-muted-foreground">XPayments</span>
+      <span>{t("footer.poweredBy")}</span>
+      <span className="font-semibold text-muted-foreground">
+        {t("footer.xpayments")}
+      </span>
     </div>
   );
 }

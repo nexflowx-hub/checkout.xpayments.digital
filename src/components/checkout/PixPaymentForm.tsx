@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Clock, QrCode, Smartphone, RefreshCw, Shield } from "lucide-react";
 import type { PixCheckoutData, PaymentLinkData } from "@/types/checkout";
 import { formatCurrency, getPixCode, isQrCodeImage } from "@/types/checkout";
+import { useI18n } from "@/lib/i18n";
 
 interface PixPaymentFormProps {
   checkoutData: PixCheckoutData;
@@ -21,6 +22,7 @@ export function PixPaymentForm({
   paymentLink,
   onSuccess,
 }: PixPaymentFormProps) {
+  const { t } = useI18n();
   const pixCode = getPixCode(checkoutData);
   const { expiresAt, qrCode } = checkoutData;
 
@@ -37,7 +39,7 @@ export function PixPaymentForm({
     function updateTimer() {
       const diff = new Date(expiresAt).getTime() - Date.now();
       if (diff <= 0) {
-        setTimeLeft("Expirado");
+        setTimeLeft(t("pix.expired"));
         return;
       }
       const minutes = Math.floor(diff / 60000);
@@ -50,7 +52,7 @@ export function PixPaymentForm({
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [expiresAt]);
+  }, [expiresAt, t]);
 
   const handleCopy = useCallback(async () => {
     if (!pixCode) return;
@@ -72,14 +74,14 @@ export function PixPaymentForm({
     }
   }, [pixCode]);
 
-  const isExpired = timeLeft === "Expirado";
+  const isExpired = timeLeft === t("pix.expired");
 
   return (
     <div className="space-y-6">
       {/* QR Code */}
       <div className="flex flex-col items-center gap-4">
         <div className="relative">
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-lg shadow-black/20">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-lg dark:shadow-black/20">
             {hasQrImage ? (
               <img
                 src={qrCode}
@@ -101,7 +103,9 @@ export function PixPaymentForm({
           {isExpired && (
             <div className="absolute inset-0 bg-background/85 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-2">
               <Clock className="h-6 w-6 text-destructive" />
-              <p className="text-sm font-medium text-destructive">QR Expirado</p>
+              <p className="text-sm font-medium text-destructive">
+                {t("pix.qrExpired")}
+              </p>
             </div>
           )}
         </div>
@@ -110,24 +114,21 @@ export function PixPaymentForm({
           <div className="flex items-center justify-center gap-2">
             <QrCode className="h-4 w-4" style={{ color: brandColor }} />
             <p className="text-sm font-medium text-foreground">
-              Escaneie o QR Code
+              {t("pix.scanTitle")}
             </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Abra o app do seu banco e escaneie
+            {t("pix.scanSubtitle")}
           </p>
         </div>
       </div>
 
       {/* Timer & Amount */}
       <div className="flex items-center justify-center gap-3">
-        <Badge
-          variant="outline"
-          className="text-xs gap-1.5 px-3 py-1"
-        >
+        <Badge variant="outline" className="text-xs gap-1.5 px-3 py-1">
           <Clock className={`h-3 w-3 ${isExpired ? "text-destructive" : ""}`} />
           <span className={isExpired ? "text-destructive font-medium" : ""}>
-            {isExpired ? "Expirado" : timeLeft}
+            {isExpired ? t("pix.expired") : timeLeft}
           </span>
         </Badge>
         <Badge
@@ -145,7 +146,7 @@ export function PixPaymentForm({
           <div className="flex items-center gap-2">
             <Smartphone className="h-4 w-4 text-muted-foreground" />
             <p className="text-sm font-medium text-foreground">
-              Código PIX Copia e Cola
+              {t("pix.copyTitle")}
             </p>
           </div>
           <div className="flex gap-2">
@@ -163,12 +164,14 @@ export function PixPaymentForm({
               {copied ? (
                 <>
                   <Check className="h-4 w-4 text-green-400" />
-                  <span className="text-green-400 hidden sm:inline">Copiado</span>
+                  <span className="text-green-400 hidden sm:inline">
+                    {t("pix.copied")}
+                  </span>
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4" />
-                  <span className="hidden sm:inline">Copiar</span>
+                  <span className="hidden sm:inline">{t("pix.copy")}</span>
                 </>
               )}
             </Button>
@@ -185,14 +188,14 @@ export function PixPaymentForm({
           onClick={() => window.location.reload()}
         >
           <RefreshCw className="h-4 w-4" />
-          Gerar novo QR Code
+          {t("pix.generateNew")}
         </Button>
       )}
 
       <div className="flex items-center justify-center gap-2 pt-1">
         <Shield className="h-3 w-3 text-muted-foreground" />
         <p className="text-[11px] text-muted-foreground">
-          Após o pagamento, a página será atualizada automaticamente.
+          {t("pix.autoRefresh")}
         </p>
       </div>
     </div>

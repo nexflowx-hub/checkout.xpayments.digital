@@ -48,7 +48,7 @@ export type GatewayType = string;
 export interface StripeCheckoutData {
   clientSecret: string;
   providerTxId: string;
-  publishableKey?: string;
+  publicKey: string;
 }
 
 export interface PixCheckoutData {
