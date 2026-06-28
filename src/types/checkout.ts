@@ -38,7 +38,7 @@ export interface InitiateCheckoutRequest {
 
 // ── Gateway Response (PASSO C) ──
 
-export type GatewayType = "STRIPE_PT_002" | "MISTIC_BR_001" | string;
+export type GatewayType = string;
 
 export interface StripeCheckoutData {
   clientSecret: string;
@@ -47,8 +47,10 @@ export interface StripeCheckoutData {
 }
 
 export interface PixCheckoutData {
-  pixCode: string;
+  pixString?: string;
+  pixCode?: string;
   providerTxId: string;
+  qrCode?: string;
   qrCodeBase64?: string;
   expiresAt?: string;
 }
@@ -82,6 +84,23 @@ export function isStripeCheckoutData(
   data: CheckoutData
 ): data is StripeCheckoutData {
   return "clientSecret" in data;
+}
+
+export function isPixCheckoutData(
+  data: CheckoutData
+): data is PixCheckoutData {
+  return !("clientSecret" in data);
+}
+
+/** Get the PIX string from either pixString or pixCode field */
+export function getPixCode(data: PixCheckoutData): string {
+  return data.pixString || data.pixCode || "";
+}
+
+/** Check if the qrCode field looks like a URL or data URI (image) */
+export function isQrCodeImage(qrCode: string | undefined): boolean {
+  if (!qrCode) return false;
+  return qrCode.startsWith("http") || qrCode.startsWith("data:");
 }
 
 export function formatCurrency(amount: number, currency: string): string {

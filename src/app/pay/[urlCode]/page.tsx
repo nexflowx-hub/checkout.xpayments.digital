@@ -17,13 +17,21 @@ import {
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
 import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
+import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
 import { fetchPaymentLink, initiateCheckout } from "@/lib/api-client";
 import type {
   PaymentLinkData,
   CheckoutStep,
   CustomerDetails,
+  CheckoutData,
 } from "@/types/checkout";
-import { formatCurrency } from "@/types/checkout";
+import {
+  formatCurrency,
+  isStripeGateway,
+  isPixGateway,
+  isStripeCheckoutData,
+  isPixCheckoutData,
+} from "@/types/checkout";
 
 // ── Status check from URL query ──
 
@@ -36,6 +44,13 @@ function usePaymentStatus() {
     if (statusParam === "cancelled") return "cancelled";
     return null;
   }, [statusParam]);
+}
+
+// ── Checkout result from Master Backend ──
+
+interface CheckoutResult {
+  gateway: string;
+  checkoutData: CheckoutData;
 }
 
 // ── Step Indicator ──
@@ -87,7 +102,7 @@ function StepIndicator({
             </div>
             {!isLast && (
               <div
-                className="h-px w-6"
+                className="h-px w-4 sm:w-6"
                 style={{
                   backgroundColor: isCompleted ? brandColor : "var(--border)",
                 }}
@@ -110,15 +125,15 @@ function SuccessScreen({
   storeName: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+    <div className="flex flex-col items-center justify-center py-10 sm:py-12 text-center space-y-4">
       <div
-        className="flex items-center justify-center h-16 w-16 rounded-full"
+        className="flex items-center justify-center h-14 w-14 sm:h-16 sm:w-16 rounded-full"
         style={{ backgroundColor: `${brandColor}15` }}
       >
-        <CheckCircle2 className="h-8 w-8" style={{ color: brandColor }} />
+        <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8" style={{ color: brandColor }} />
       </div>
       <div>
-        <h2 className="text-xl font-bold text-foreground">Pagamento Confirmado!</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-foreground">Pagamento Confirmado!</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Obrigado pela sua compra em {storeName}.
         </p>
@@ -134,12 +149,12 @@ function SuccessScreen({
 
 function ErrorScreen({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-      <div className="flex items-center justify-center h-16 w-16 rounded-full bg-destructive/10">
-        <XCircle className="h-8 w-8 text-destructive" />
+    <div className="flex flex-col items-center justify-center py-10 sm:py-12 text-center space-y-4">
+      <div className="flex items-center justify-center h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-destructive/10">
+        <XCircle className="h-7 w-7 sm:h-8 sm:w-8 text-destructive" />
       </div>
       <div>
-        <h2 className="text-xl font-bold text-foreground">Ops!</h2>
+        <h2 className="text-lg sm:text-xl font-bold text-foreground">Ops!</h2>
         <p className="text-sm text-muted-foreground mt-1">{message}</p>
       </div>
     </div>
@@ -154,8 +169,8 @@ function CheckoutSkeleton() {
       <div className="p-4">
         <Skeleton className="h-5 w-32" />
       </div>
-      <div className="flex-1 max-w-6xl mx-auto w-full px-4 pb-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-2">
+      <div className="flex-1 max-w-5xl lg:max-w-6xl mx-auto w-full px-4 pb-8 grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
+        <div className="hidden lg:block lg:col-span-2">
           <Card>
             <CardContent className="p-6 space-y-4">
               <Skeleton className="h-10 w-40" />
@@ -168,7 +183,7 @@ function CheckoutSkeleton() {
         </div>
         <div className="lg:col-span-3">
           <Card>
-            <CardContent className="p-6 space-y-4">
+            <CardContent className="p-4 sm:p-6 space-y-4">
               <Skeleton className="h-5 w-48" />
               <Skeleton className="h-11 w-full" />
               <Skeleton className="h-11 w-full" />
@@ -194,7 +209,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [step, setStep] = useState<CheckoutStep>("customer_details");
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
@@ -209,7 +224,7 @@ export default function CheckoutPage() {
       .finally(() => setLoading(false));
   }, [params.urlCode]);
 
-  // PASSO B: Submit customer details → get clientSecret from Master Backend
+  // PASSO B: Submit customer details → get gateway + checkoutData from Master Backend
   const handleCustomerSubmit = useCallback(
     async (customerDetails: CustomerDetails) => {
       if (!paymentLink) return;
@@ -225,18 +240,9 @@ export default function CheckoutPage() {
           customerDetails
         );
 
-        // Extract clientSecret from the gateway response
-        const cs =
-          result.checkoutData && "clientSecret" in result.checkoutData
-            ? (result.checkoutData as { clientSecret: string }).clientSecret
-            : null;
-
-        if (cs) {
-          setClientSecret(cs);
-          setStep("payment");
-        } else {
-          setInitiateError("Gateway de pagamento não suportado ou sem clientSecret.");
-        }
+        // Store full result — gateway type determines which form to render
+        setCheckoutResult(result);
+        setStep("payment");
       } catch (err) {
         console.error("[checkout] Failed to initiate payment:", err);
         setInitiateError(
@@ -253,9 +259,14 @@ export default function CheckoutPage() {
 
   const handleGoBack = useCallback(() => {
     setStep("customer_details");
-    setClientSecret(null);
+    setCheckoutResult(null);
     setInitiateError(null);
   }, []);
+
+  const handlePixSuccess = useCallback(() => {
+    // PIX payment confirmed — redirect to success
+    window.location.href = `/pay/${params.urlCode}?status=success`;
+  }, [params.urlCode]);
 
   // ── Render states ──
 
@@ -272,8 +283,8 @@ export default function CheckoutPage() {
       <div className="min-h-screen flex flex-col">
         <CheckoutHeader branding={branding} brandColor={brandColor} />
         <main className="flex-1 flex items-center justify-center px-4">
-          <Card className="w-full max-w-md">
-            <CardContent className="p-6">
+          <Card className="w-full max-w-md mx-4">
+            <CardContent className="p-4 sm:p-6">
               <SuccessScreen
                 brandColor={brandColor}
                 storeName={branding.storeName}
@@ -290,15 +301,26 @@ export default function CheckoutPage() {
     branding.successUrl ||
     `${window.location.origin}/pay/${params.urlCode}?status=success`;
 
+  // Determine which gateway was returned
+  const gateway = checkoutResult?.gateway ?? "";
+  const isStripe = isStripeGateway(gateway);
+  const isPix = isPixGateway(gateway);
+  const stripeData = checkoutResult && isStripeCheckoutData(checkoutResult.checkoutData)
+    ? checkoutResult.checkoutData
+    : null;
+  const pixData = checkoutResult && isPixCheckoutData(checkoutResult.checkoutData)
+    ? checkoutResult.checkoutData
+    : null;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <CheckoutHeader branding={branding} brandColor={brandColor} />
 
-      <main className="flex-1 px-4 py-6">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Left: Order Summary (Desktop) */}
+      <main className="flex-1 px-3 sm:px-4 py-4 sm:py-6">
+        <div className="max-w-5xl lg:max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
+          {/* Left: Order Summary (Desktop only) */}
           <div className="hidden lg:block lg:col-span-2">
-            <Card className="sticky top-6">
+            <Card className="sticky top-20">
               <CardContent className="p-0">
                 <OrderSummary
                   paymentLink={paymentLink}
@@ -309,9 +331,9 @@ export default function CheckoutPage() {
           </div>
 
           {/* Right: Checkout Form */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 w-full">
             <Card>
-              <CardContent className="p-6 space-y-6">
+              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Step indicator + back */}
                 <div className="flex items-center justify-between">
                   <StepIndicator currentStep={step} brandColor={brandColor} />
@@ -323,7 +345,7 @@ export default function CheckoutPage() {
                       className="text-xs text-muted-foreground hover:text-foreground -mr-2"
                     >
                       <ArrowLeft className="h-3 w-3 mr-1" />
-                      Voltar
+                      <span className="hidden sm:inline">Voltar</span>
                     </Button>
                   )}
                 </div>
@@ -342,13 +364,13 @@ export default function CheckoutPage() {
                 {/* Step 1: Customer Details */}
                 {step === "customer_details" && (
                   <div className="space-y-1">
-                    <h2 className="text-lg font-semibold text-foreground">
+                    <h2 className="text-base sm:text-lg font-semibold text-foreground">
                       Informações de Contacto
                     </h2>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Insira os seus dados para prosseguir com o pagamento.
                     </p>
-                    <div className="pt-4">
+                    <div className="pt-3 sm:pt-4">
                       {initiateError && (
                         <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 mb-4">
                           <p className="text-sm text-destructive">
@@ -364,16 +386,18 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* Step 2: Stripe Payment */}
+                {/* Step 2: Payment — Dual Gateway Routing */}
                 {step === "payment" && (
                   <div className="space-y-1">
-                    <h2 className="text-lg font-semibold text-foreground">
+                    <h2 className="text-base sm:text-lg font-semibold text-foreground">
                       Pagamento
                     </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Introduza os dados do seu cartão.
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {isPix
+                        ? "Escaneie o QR Code ou copie o código PIX."
+                        : "Introduza os dados do seu cartão."}
                     </p>
-                    <div className="pt-4">
+                    <div className="pt-3 sm:pt-4">
                       {initiating ? (
                         <div className="flex flex-col items-center justify-center py-12 space-y-3">
                           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -381,14 +405,21 @@ export default function CheckoutPage() {
                             A preparar o pagamento...
                           </p>
                         </div>
-                      ) : clientSecret ? (
+                      ) : isStripe && stripeData ? (
                         <StripePaymentForm
-                          clientSecret={clientSecret}
+                          clientSecret={stripeData.clientSecret}
                           returnUrl={returnUrl}
                           brandColor={brandColor}
                         />
+                      ) : isPix && pixData ? (
+                        <PixPaymentForm
+                          checkoutData={pixData}
+                          brandColor={brandColor}
+                          paymentLink={paymentLink}
+                          onSuccess={handlePixSuccess}
+                        />
                       ) : (
-                        <ErrorScreen message="Dados de pagamento não recebidos." />
+                        <ErrorScreen message="Gateway de pagamento não suportado." />
                       )}
                     </div>
                   </div>
@@ -397,12 +428,12 @@ export default function CheckoutPage() {
             </Card>
 
             {/* Footer */}
-            <div className="flex items-center justify-center gap-2 mt-6 text-xs text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 mt-4 sm:mt-6 text-[11px] sm:text-xs text-muted-foreground">
               <ShieldCheck className="h-3 w-3" />
               <span>Powered by</span>
               <span className="font-semibold text-foreground">XPayments</span>
-              <span>&middot;</span>
-              <span>Checkout Seguro</span>
+              <span className="hidden sm:inline">&middot;</span>
+              <span className="hidden sm:inline">Checkout Seguro</span>
             </div>
           </div>
         </div>
@@ -425,23 +456,23 @@ function CheckoutHeader({
       className="sticky top-0 z-50 border-b backdrop-blur-md bg-background/80"
       style={{ borderBottomColor: `${brandColor}20` }}
     >
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="max-w-5xl lg:max-w-6xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
           {branding.logo ? (
             <img
               src={branding.logo}
               alt={branding.storeName}
-              className="h-7 w-auto max-w-[140px] object-contain"
+              className="h-6 w-auto sm:h-7 max-w-[120px] sm:max-w-[140px] object-contain"
             />
           ) : (
             <div className="flex items-center gap-2">
               <div
-                className="h-7 w-7 rounded-md flex items-center justify-center text-white font-bold text-xs"
+                className="h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center text-white font-bold text-[10px] sm:text-xs"
                 style={{ backgroundColor: brandColor }}
               >
                 {branding.storeName.slice(0, 2).toUpperCase()}
               </div>
-              <span className="font-semibold text-sm text-foreground">
+              <span className="font-semibold text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-none">
                 {branding.storeName}
               </span>
             </div>
@@ -449,7 +480,7 @@ function CheckoutHeader({
         </div>
         <Badge variant="outline" className="text-[10px] font-medium gap-1">
           <ShieldCheck className="h-3 w-3" />
-          Checkout Seguro
+          <span className="hidden sm:inline">Checkout</span> Seguro
         </Badge>
       </div>
     </header>
@@ -465,26 +496,28 @@ function MobileOrderSummary({
 }) {
   return (
     <div
-      className="rounded-lg border p-4 space-y-3"
+      className="rounded-lg border p-3 sm:p-4 space-y-3"
       style={{ borderColor: `${brandColor}20` }}
     >
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-foreground">{paymentLink.name}</p>
-        <p className="text-base font-bold text-foreground">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-foreground truncate">
+          {paymentLink.name}
+        </p>
+        <p className="text-sm sm:text-base font-bold text-foreground whitespace-nowrap">
           {formatCurrency(paymentLink.amountFiat, paymentLink.currency)}
         </p>
       </div>
       <div className="flex items-center gap-2">
         <div
-          className="h-6 w-6 rounded flex items-center justify-center text-white font-bold text-[10px]"
+          className="h-5 w-5 sm:h-6 sm:w-6 rounded flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0"
           style={{ backgroundColor: brandColor }}
         >
           {paymentLink.branding.storeName.slice(0, 2).toUpperCase()}
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground truncate">
           {paymentLink.branding.storeName}
         </span>
-        <Badge variant="secondary" className="text-[10px] ml-auto">
+        <Badge variant="secondary" className="text-[10px] ml-auto shrink-0">
           {paymentLink.currency}
         </Badge>
       </div>

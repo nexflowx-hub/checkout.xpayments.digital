@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -13,24 +13,61 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#111111",
+};
+
 export const metadata: Metadata = {
-  title: "XPayments — Hosted Checkout",
-  description: "Plataforma de checkout White-Label Multi-Tenant com Smart Routing para Stripe e PIX.",
-  keywords: ["XPayments", "checkout", "payment", "Stripe", "PIX", "white-label"],
-  authors: [{ name: "XPayments" }],
+  title: {
+    default: "XPayments — Checkout Seguro",
+    template: "%s | XPayments",
+  },
+  description:
+    "Plataforma de checkout white-label multi-tenant. Pagamento seguro via Stripe (EUR/USD) e PIX (BRL) com smart routing.",
+  keywords: [
+    "XPayments",
+    "checkout",
+    "payment",
+    "Stripe",
+    "PIX",
+    "MISTICPAY",
+    "white-label",
+    "pagamento",
+    "checkout seguro",
+    "gateway de pagamento",
+  ],
+  authors: [{ name: "NexFlowX Hub", url: "https://xpayments.digital" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/favicon.svg",
   },
   openGraph: {
-    title: "XPayments — Hosted Checkout",
-    description: "Plataforma de checkout White-Label Multi-Tenant",
+    title: "XPayments — Checkout Seguro",
+    description: "Plataforma de checkout white-label com Stripe e PIX.",
     siteName: "XPayments",
     type: "website",
+    locale: "pt_PT",
+    alternateLocale: ["pt_BR", "en_US"],
   },
   twitter: {
-    card: "summary_large_image",
-    title: "XPayments — Hosted Checkout",
-    description: "Plataforma de checkout White-Label Multi-Tenant",
+    card: "summary",
+    title: "XPayments — Checkout Seguro",
+    description: "Plataforma de checkout white-label com Stripe e PIX.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 
@@ -40,7 +77,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >

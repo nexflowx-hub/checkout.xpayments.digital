@@ -9,7 +9,8 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, CreditCard } from "lucide-react";
+import { Loader2, Lock, CreditCard, AlertTriangle } from "lucide-react";
+import { StripeErrorBoundary } from "@/components/checkout/StripeErrorBoundary";
 
 // ── Module-level Stripe.js promise ──
 
@@ -95,7 +96,69 @@ function CheckoutForm({ returnUrl }: { returnUrl: string }) {
   );
 }
 
-// ── Wrapper: provides Elements context ──
+// ── Fallback when Stripe key is not configured ──
+
+function StripeKeyMissing() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <CreditCard className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">
+          Dados do Cartão
+        </p>
+      </div>
+      <div className="rounded-lg border bg-muted/30 p-5 sm:p-6 text-center space-y-3">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+          <CreditCard className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            Stripe Payment Element
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            Configure a variável{" "}
+            <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">
+              NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+            </code>{" "}
+            no ambiente de deploy para ativar o pagamento.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Fallback when Stripe Elements crashes at runtime ──
+
+function StripeCrashFallback() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <CreditCard className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium text-foreground">
+          Dados do Cartão
+        </p>
+      </div>
+      <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/20 p-5 sm:p-6 text-center space-y-3">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
+          <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            Aguardando configuração da Chave Stripe do Lojista
+          </p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            O Stripe não conseguiu inicializar o pagamento.
+            Isto geralmente ocorre quando a chave publicável ainda não foi
+            configurada para esta loja. Por favor, tente novamente mais tarde.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Wrapper: provides Elements context, wrapped in ErrorBoundary ──
 
 interface StripePaymentFormProps {
   clientSecret: string;
@@ -129,40 +192,18 @@ export function StripePaymentForm({
     [clientSecret, brandColor]
   );
 
-  // Missing Stripe key → show setup notice
+  // Missing Stripe key → show setup notice (no crash)
   if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <CreditCard className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium text-foreground">
-            Dados do Cartão
-          </p>
-        </div>
-        <div className="rounded-lg border bg-muted/30 p-6 text-center space-y-3">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            <CreditCard className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              Stripe Payment Element
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Configure a variável{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">
-                NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-              </code>{" "}
-              no Vercel para ativar o pagamento real.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <StripeKeyMissing />;
   }
 
+  // Stripe key exists but may fail at render time (invalid clientSecret, etc.)
+  // → wrap in ErrorBoundary to prevent white screen
   return (
-    <Elements stripe={stripePromise} options={options}>
-      <CheckoutForm returnUrl={returnUrl} />
-    </Elements>
+    <StripeErrorBoundary fallback={<StripeCrashFallback />}>
+      <Elements stripe={stripePromise} options={options}>
+        <CheckoutForm returnUrl={returnUrl} />
+      </Elements>
+    </StripeErrorBoundary>
   );
 }
