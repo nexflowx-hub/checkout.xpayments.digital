@@ -44,3 +44,30 @@ Stage Summary:
 - PixPaymentForm handles both MISTICPAY response format and legacy format
 - Mobile-optimized with responsive breakpoints throughout
 - Proper SEO: viewport, favicon, OG, Twitter, robots, lang attribute
+
+---
+Task ID: 3
+Agent: main
+Task: Premium dark checkout refactoring — AZORES.BIO-inspired two-step flow
+
+Work Log:
+- Wrapped entire checkout in `className="dark"` to force dark CSS variables on all shadcn components
+- Background: #09090b (zinc-950), cards: CSS var --card (dark), borders: border-border/50
+- Backdrop-blur glass header with brand-colored logo initial
+- Two-step flow: Step 1 (Lead Capture) with split layout → Step 2 (Payment) with compact order bar
+- CustomerDetailsForm: added phone, address, postalCode, city fields; auto-detect country via navigator.language
+- OrderSummary: product image support, CompactOrderSummary for mobile inline + Step 2 bar
+- StripePaymentForm: Tabs with 'Cartão / Pagamento' (PaymentElement, night theme, brand color accents) + 'Web3 / Crypto' placeholder (Wallet icon, Metamask badge)
+- Stripe appearance: theme='night', custom rules for Label/Input/Tab, spacingBranding: 'none'
+- Stripe button shows amount: 'Pagar agora — €150.00'
+- PixPaymentForm: dark QR card with white bg + shadow, brand-colored amount badge
+- Home page: matching dark theme
+- Deleted stale PaymentTabs.tsx
+- ESLint clean, committed, pushed to GitHub
+
+Stage Summary:
+- Premium dark checkout fully implemented with AZORES.BIO design language
+- Two-step conversion-optimized flow: capture first, pay second
+- Stripe tabs with Web3 placeholder ready for future crypto integration
+- Expanded lead capture: 7 fields (3 required, 4 optional) with country auto-detect
+- All components defensively coded — no crashes on missing payload data
