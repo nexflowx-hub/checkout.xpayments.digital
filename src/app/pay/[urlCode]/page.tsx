@@ -2,9 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,15 +11,16 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  CreditCard,
+  QrCode,
 } from "lucide-react";
-import { OrderSummary } from "@/components/checkout/OrderSummary";
+import { OrderSummary, CompactOrderSummary } from "@/components/checkout/OrderSummary";
 import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
 import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
 import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
 import { fetchPaymentLink, initiateCheckout } from "@/lib/api-client";
 import type {
   PaymentLinkData,
-  CheckoutStep,
   CustomerDetails,
   CheckoutData,
 } from "@/types/checkout";
@@ -33,12 +32,11 @@ import {
   isPixCheckoutData,
 } from "@/types/checkout";
 
-// ── Status check from URL query ──
+// ── Status from URL query ──
 
 function usePaymentStatus() {
   const searchParams = useSearchParams();
   const statusParam = searchParams.get("status");
-
   return useMemo<"success" | "cancelled" | null>(() => {
     if (statusParam === "success") return "success";
     if (statusParam === "cancelled") return "cancelled";
@@ -46,71 +44,40 @@ function usePaymentStatus() {
   }, [statusParam]);
 }
 
-// ── Checkout result from Master Backend ──
+// ── Checkout result ──
 
 interface CheckoutResult {
   gateway: string;
   checkoutData: CheckoutData;
 }
 
-// ── Step Indicator ──
+// ── Loading Skeleton ──
 
-function StepIndicator({
-  currentStep,
-  brandColor,
-}: {
-  currentStep: CheckoutStep;
-  brandColor: string;
-}) {
-  const steps: { key: CheckoutStep; label: string }[] = [
-    { key: "customer_details", label: "Dados" },
-    { key: "payment", label: "Pagamento" },
-  ];
-
+function CheckoutSkeleton() {
   return (
-    <div className="flex items-center gap-2">
-      {steps.map((step, i) => {
-        const isActive = step.key === currentStep;
-        const isCompleted = steps.findIndex((s) => s.key === currentStep) > i;
-        const isLast = i === steps.length - 1;
-
-        return (
-          <div key={step.key} className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <div
-                className="flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-semibold transition-colors"
-                style={{
-                  backgroundColor: isActive || isCompleted
-                    ? brandColor
-                    : "var(--muted)",
-                  color: isActive || isCompleted ? "#fff" : "var(--muted-foreground)",
-                }}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  i + 1
-                )}
-              </div>
-              <span
-                className={`text-xs font-medium transition-colors ${
-                  isActive ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {!isLast && (
-              <div
-                className="h-px w-4 sm:w-6"
-                style={{
-                  backgroundColor: isCompleted ? brandColor : "var(--border)",
-                }}
-              />
-            )}
+    <div className="min-h-screen flex flex-col">
+      <div className="p-4"><Skeleton className="h-5 w-28" /></div>
+      <div className="flex-1 max-w-5xl mx-auto w-full px-4 pb-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-2">
+          <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
+            <Skeleton className="h-10 w-40" />
+            <Skeleton className="h-4 w-24" />
+            <div className="h-px bg-border" />
+            <Skeleton className="h-20 w-full rounded-lg" />
+            <Skeleton className="h-8 w-32" />
           </div>
-        );
-      })}
+        </div>
+        <div className="lg:col-span-3">
+          <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full mt-2" />
+            <Skeleton className="h-12 w-full mt-4" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -125,22 +92,24 @@ function SuccessScreen({
   storeName: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 sm:py-12 text-center space-y-4">
-      <div
-        className="flex items-center justify-center h-14 w-14 sm:h-16 sm:w-16 rounded-full"
-        style={{ backgroundColor: `${brandColor}15` }}
-      >
-        <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8" style={{ color: brandColor }} />
-      </div>
-      <div>
-        <h2 className="text-lg sm:text-xl font-bold text-foreground">Pagamento Confirmado!</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Obrigado pela sua compra em {storeName}.
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="text-center space-y-5 max-w-sm w-full">
+        <div
+          className="mx-auto flex items-center justify-center h-16 w-16 rounded-full"
+          style={{ backgroundColor: `${brandColor}18` }}
+        >
+          <CheckCircle2 className="h-8 w-8" style={{ color: brandColor }} />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-xl font-bold text-foreground">Pagamento Confirmado!</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Obrigado pela sua compra em <span className="text-foreground font-medium">{storeName}</span>.
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Enviámos um email de confirmação com os detalhes do pedido.
         </p>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Enviámos um email de confirmação com os detalhes do pedido.
-      </p>
     </div>
   );
 }
@@ -149,86 +118,51 @@ function SuccessScreen({
 
 function ErrorScreen({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 sm:py-12 text-center space-y-4">
-      <div className="flex items-center justify-center h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-destructive/10">
-        <XCircle className="h-7 w-7 sm:h-8 sm:w-8 text-destructive" />
-      </div>
-      <div>
-        <h2 className="text-lg sm:text-xl font-bold text-foreground">Ops!</h2>
-        <p className="text-sm text-muted-foreground mt-1">{message}</p>
-      </div>
-    </div>
-  );
-}
-
-// ── Loading Skeleton ──
-
-function CheckoutSkeleton() {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <div className="p-4">
-        <Skeleton className="h-5 w-32" />
-      </div>
-      <div className="flex-1 max-w-5xl lg:max-w-6xl mx-auto w-full px-4 pb-8 grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
-        <div className="hidden lg:block lg:col-span-2">
-          <Card>
-            <CardContent className="p-6 space-y-4">
-              <Skeleton className="h-10 w-40" />
-              <Skeleton className="h-4 w-24" />
-              <Separator />
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-8 w-32" />
-            </CardContent>
-          </Card>
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="text-center space-y-5 max-w-sm w-full">
+        <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-destructive/10">
+          <XCircle className="h-8 w-8 text-destructive" />
         </div>
-        <div className="lg:col-span-3">
-          <Card>
-            <CardContent className="p-4 sm:p-6 space-y-4">
-              <Skeleton className="h-5 w-48" />
-              <Skeleton className="h-11 w-full" />
-              <Skeleton className="h-11 w-full" />
-              <Skeleton className="h-11 w-full" />
-              <Skeleton className="h-11 w-full mt-4" />
-            </CardContent>
-          </Card>
+        <div className="space-y-2">
+          <h1 className="text-xl font-bold text-foreground">Ops!</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">{message}</p>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Main Checkout Page (Dumb UI) ──
+// ── Main Checkout Page ──
 
 export default function CheckoutPage() {
   const params = useParams<{ urlCode: string }>();
   const paymentStatus = usePaymentStatus();
 
-  // State — only what the UI needs to render
   const [paymentLink, setPaymentLink] = useState<PaymentLinkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [step, setStep] = useState<CheckoutStep>("customer_details");
+  // Step management
+  const [step, setStep] = useState<"customer_details" | "payment">("customer_details");
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
-  // PASSO A: Fetch payment link data from Master Backend
+  // Fetch payment link
   useEffect(() => {
     fetchPaymentLink(params.urlCode)
       .then(setPaymentLink)
       .catch((err) => {
-        console.error("[checkout] Failed to fetch payment link:", err);
+        console.error("[checkout] fetch error:", err);
         setError(err.message || "Não foi possível carregar o link de pagamento.");
       })
       .finally(() => setLoading(false));
   }, [params.urlCode]);
 
-  // PASSO B: Submit customer details → get gateway + checkoutData from Master Backend
+  // Submit customer details
   const handleCustomerSubmit = useCallback(
     async (customerDetails: CustomerDetails) => {
       if (!paymentLink) return;
-
       setInitiating(true);
       setInitiateError(null);
 
@@ -239,12 +173,10 @@ export default function CheckoutPage() {
           paymentLink.currency,
           customerDetails
         );
-
-        // Store full result — gateway type determines which form to render
         setCheckoutResult(result);
         setStep("payment");
       } catch (err) {
-        console.error("[checkout] Failed to initiate payment:", err);
+        console.error("[checkout] initiate error:", err);
         setInitiateError(
           err instanceof Error
             ? err.message
@@ -264,7 +196,6 @@ export default function CheckoutPage() {
   }, []);
 
   const handlePixSuccess = useCallback(() => {
-    // PIX payment confirmed — redirect to success
     window.location.href = `/pay/${params.urlCode}?status=success`;
   }, [params.urlCode]);
 
@@ -277,31 +208,18 @@ export default function CheckoutPage() {
   const { branding } = paymentLink;
   const brandColor = branding.color || "#111111";
 
-  // Payment success screen
+  // Success screen
   if (paymentStatus === "success") {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="dark min-h-screen bg-[#09090b]">
         <CheckoutHeader branding={branding} brandColor={brandColor} />
-        <main className="flex-1 flex items-center justify-center px-4">
-          <Card className="w-full max-w-md mx-4">
-            <CardContent className="p-4 sm:p-6">
-              <SuccessScreen
-                brandColor={brandColor}
-                storeName={branding.storeName}
-              />
-            </CardContent>
-          </Card>
-        </main>
+        <SuccessScreen brandColor={brandColor} storeName={branding.storeName} />
+        <CheckoutFooter />
       </div>
     );
   }
 
-  // Compute returnUrl for Stripe redirect
-  const returnUrl =
-    branding.successUrl ||
-    `${window.location.origin}/pay/${params.urlCode}?status=success`;
-
-  // Determine which gateway was returned
+  // Gateway resolution
   const gateway = checkoutResult?.gateway ?? "";
   const isStripe = isStripeGateway(gateway);
   const isPix = isPixGateway(gateway);
@@ -312,130 +230,136 @@ export default function CheckoutPage() {
     ? checkoutResult.checkoutData
     : null;
 
-  return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <CheckoutHeader branding={branding} brandColor={brandColor} />
+  const returnUrl =
+    branding.successUrl ||
+    `${window.location.origin}/pay/${params.urlCode}?status=success`;
 
-      <main className="flex-1 px-3 sm:px-4 py-4 sm:py-6">
-        <div className="max-w-5xl lg:max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
-          {/* Left: Order Summary (Desktop only) */}
-          <div className="hidden lg:block lg:col-span-2">
-            <Card className="sticky top-20">
-              <CardContent className="p-0">
-                <OrderSummary
-                  paymentLink={paymentLink}
+  const amountStr = formatCurrency(paymentLink.amountFiat, paymentLink.currency);
+
+  // ── STEP 1: Lead Capture ──
+  if (step === "customer_details") {
+    return (
+      <div className="dark min-h-screen flex flex-col bg-[#09090b]">
+        <CheckoutHeader branding={branding} brandColor={brandColor} />
+
+        <main className="flex-1 px-3 sm:px-4 py-4 sm:py-8">
+          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6 items-start">
+            {/* Left: Order Summary (desktop) */}
+            <div className="hidden lg:block lg:col-span-2">
+              <div className="rounded-xl border border-border/50 bg-card sticky top-20">
+                <OrderSummary paymentLink={paymentLink} brandColor={brandColor} />
+              </div>
+            </div>
+
+            {/* Right: Form */}
+            <div className="lg:col-span-3 w-full">
+              <div className="rounded-xl border border-border/50 bg-card p-5 sm:p-6 lg:p-8">
+                {/* Mobile order summary */}
+                <div className="lg:hidden mb-6 p-4 rounded-lg bg-muted/30 border border-border/30">
+                  <CompactOrderSummary paymentLink={paymentLink} brandColor={brandColor} />
+                </div>
+
+                <div className="space-y-1 mb-6">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
+                    Informações de Contacto
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Insira os seus dados para prosseguir.
+                  </p>
+                </div>
+
+                {initiateError && (
+                  <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 mb-5">
+                    <p className="text-sm text-destructive">{initiateError}</p>
+                  </div>
+                )}
+
+                <CustomerDetailsForm
+                  onSubmit={handleCustomerSubmit}
                   brandColor={brandColor}
                 />
-              </CardContent>
-            </Card>
-          </div>
+              </div>
 
-          {/* Right: Checkout Form */}
-          <div className="lg:col-span-3 w-full">
-            <Card>
-              <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-                {/* Step indicator + back */}
-                <div className="flex items-center justify-between">
-                  <StepIndicator currentStep={step} brandColor={brandColor} />
-                  {step === "payment" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleGoBack}
-                      className="text-xs text-muted-foreground hover:text-foreground -mr-2"
-                    >
-                      <ArrowLeft className="h-3 w-3 mr-1" />
-                      <span className="hidden sm:inline">Voltar</span>
-                    </Button>
-                  )}
-                </div>
-
-                <Separator />
-
-                {/* Mobile Order Summary (inline) */}
-                <div className="lg:hidden">
-                  <MobileOrderSummary
-                    paymentLink={paymentLink}
-                    brandColor={brandColor}
-                  />
-                  <Separator className="mt-4" />
-                </div>
-
-                {/* Step 1: Customer Details */}
-                {step === "customer_details" && (
-                  <div className="space-y-1">
-                    <h2 className="text-base sm:text-lg font-semibold text-foreground">
-                      Informações de Contacto
-                    </h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Insira os seus dados para prosseguir com o pagamento.
-                    </p>
-                    <div className="pt-3 sm:pt-4">
-                      {initiateError && (
-                        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 mb-4">
-                          <p className="text-sm text-destructive">
-                            {initiateError}
-                          </p>
-                        </div>
-                      )}
-                      <CustomerDetailsForm
-                        onSubmit={handleCustomerSubmit}
-                        brandColor={brandColor}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 2: Payment — Dual Gateway Routing */}
-                {step === "payment" && (
-                  <div className="space-y-1">
-                    <h2 className="text-base sm:text-lg font-semibold text-foreground">
-                      Pagamento
-                    </h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      {isPix
-                        ? "Escaneie o QR Code ou copie o código PIX."
-                        : "Introduza os dados do seu cartão."}
-                    </p>
-                    <div className="pt-3 sm:pt-4">
-                      {initiating ? (
-                        <div className="flex flex-col items-center justify-center py-12 space-y-3">
-                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            A preparar o pagamento...
-                          </p>
-                        </div>
-                      ) : isStripe && stripeData ? (
-                        <StripePaymentForm
-                          clientSecret={stripeData.clientSecret}
-                          returnUrl={returnUrl}
-                          brandColor={brandColor}
-                        />
-                      ) : isPix && pixData ? (
-                        <PixPaymentForm
-                          checkoutData={pixData}
-                          brandColor={brandColor}
-                          paymentLink={paymentLink}
-                          onSuccess={handlePixSuccess}
-                        />
-                      ) : (
-                        <ErrorScreen message="Gateway de pagamento não suportado." />
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Footer */}
-            <div className="flex items-center justify-center gap-2 mt-4 sm:mt-6 text-[11px] sm:text-xs text-muted-foreground">
-              <ShieldCheck className="h-3 w-3" />
-              <span>Powered by</span>
-              <span className="font-semibold text-foreground">XPayments</span>
-              <span className="hidden sm:inline">&middot;</span>
-              <span className="hidden sm:inline">Checkout Seguro</span>
+              <CheckoutFooter />
             </div>
           </div>
+        </main>
+      </div>
+    );
+  }
+
+  // ── STEP 2: Payment ──
+  return (
+    <div className="dark min-h-screen flex flex-col bg-[#09090b]">
+      <CheckoutHeader branding={branding} brandColor={brandColor} onBack={handleGoBack} showBack />
+
+      <main className="flex-1 px-3 sm:px-4 py-4 sm:py-8">
+        <div className="max-w-2xl mx-auto w-full">
+          <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
+            {/* Compact order bar */}
+            <div className="px-5 sm:px-6 py-4 border-b border-border/50 bg-muted/20">
+              <CompactOrderSummary paymentLink={paymentLink} brandColor={brandColor} />
+            </div>
+
+            <div className="p-5 sm:p-6 lg:p-8">
+              {/* Gateway icon + label */}
+              <div className="flex items-center gap-2.5 mb-5">
+                {isPix ? (
+                  <div
+                    className="flex items-center justify-center h-8 w-8 rounded-lg"
+                    style={{ backgroundColor: `${brandColor}15` }}
+                  >
+                    <QrCode className="h-4 w-4" style={{ color: brandColor }} />
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center justify-center h-8 w-8 rounded-lg"
+                    style={{ backgroundColor: `${brandColor}15` }}
+                  >
+                    <CreditCard className="h-4 w-4" style={{ color: brandColor }} />
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {isPix ? "Pagamento PIX" : "Pagamento"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isPix
+                      ? "Escaneie o QR Code ou copie o código."
+                      : "Cartão, MBWay, Multibanco e outros métodos."}
+                  </p>
+                </div>
+              </div>
+
+              <Separator className="mb-5" />
+
+              {/* Payment content */}
+              {initiating ? (
+                <div className="flex flex-col items-center justify-center py-14 space-y-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">A preparar o pagamento...</p>
+                </div>
+              ) : isStripe && stripeData ? (
+                <StripePaymentForm
+                  clientSecret={stripeData.clientSecret}
+                  returnUrl={returnUrl}
+                  brandColor={brandColor}
+                  amount={amountStr}
+                />
+              ) : isPix && pixData ? (
+                <PixPaymentForm
+                  checkoutData={pixData}
+                  brandColor={brandColor}
+                  paymentLink={paymentLink}
+                  onSuccess={handlePixSuccess}
+                />
+              ) : (
+                <ErrorScreen message="Gateway de pagamento não suportado." />
+              )}
+            </div>
+          </div>
+
+          <CheckoutFooter />
         </div>
       </main>
     </div>
@@ -447,17 +371,28 @@ export default function CheckoutPage() {
 function CheckoutHeader({
   branding,
   brandColor,
+  onBack,
+  showBack,
 }: {
   branding: { storeName: string; logo?: string };
   brandColor: string;
+  onBack?: () => void;
+  showBack?: boolean;
 }) {
   return (
-    <header
-      className="sticky top-0 z-50 border-b backdrop-blur-md bg-background/80"
-      style={{ borderBottomColor: `${brandColor}20` }}
-    >
-      <div className="max-w-5xl lg:max-w-6xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#09090b]/80 border-b border-border/40">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {showBack && onBack && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              className="h-8 w-8 p-0 mr-1 shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
           {branding.logo ? (
             <img
               src={branding.logo}
@@ -465,62 +400,33 @@ function CheckoutHeader({
               className="h-6 w-auto sm:h-7 max-w-[120px] sm:max-w-[140px] object-contain"
             />
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <div
-                className="h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center text-white font-bold text-[10px] sm:text-xs"
+                className="h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0"
                 style={{ backgroundColor: brandColor }}
               >
                 {branding.storeName.slice(0, 2).toUpperCase()}
               </div>
-              <span className="font-semibold text-xs sm:text-sm text-foreground truncate max-w-[120px] sm:max-w-none">
+              <span className="font-semibold text-xs sm:text-sm text-foreground truncate">
                 {branding.storeName}
               </span>
             </div>
           )}
         </div>
-        <Badge variant="outline" className="text-[10px] font-medium gap-1">
+        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground shrink-0">
           <ShieldCheck className="h-3 w-3" />
           <span className="hidden sm:inline">Checkout</span> Seguro
-        </Badge>
+        </div>
       </div>
     </header>
   );
 }
 
-function MobileOrderSummary({
-  paymentLink,
-  brandColor,
-}: {
-  paymentLink: PaymentLinkData;
-  brandColor: string;
-}) {
+function CheckoutFooter() {
   return (
-    <div
-      className="rounded-lg border p-3 sm:p-4 space-y-3"
-      style={{ borderColor: `${brandColor}20` }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-foreground truncate">
-          {paymentLink.name}
-        </p>
-        <p className="text-sm sm:text-base font-bold text-foreground whitespace-nowrap">
-          {formatCurrency(paymentLink.amountFiat, paymentLink.currency)}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <div
-          className="h-5 w-5 sm:h-6 sm:w-6 rounded flex items-center justify-center text-white font-bold text-[9px] sm:text-[10px] shrink-0"
-          style={{ backgroundColor: brandColor }}
-        >
-          {paymentLink.branding.storeName.slice(0, 2).toUpperCase()}
-        </div>
-        <span className="text-xs text-muted-foreground truncate">
-          {paymentLink.branding.storeName}
-        </span>
-        <Badge variant="secondary" className="text-[10px] ml-auto shrink-0">
-          {paymentLink.currency}
-        </Badge>
-      </div>
+    <div className="flex items-center justify-center gap-1.5 pt-6 pb-2 text-[11px] text-muted-foreground/60">
+      <span>Powered by</span>
+      <span className="font-semibold text-muted-foreground">XPayments</span>
     </div>
   );
 }

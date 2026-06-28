@@ -9,18 +9,25 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, CreditCard, AlertTriangle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Lock, CreditCard, AlertTriangle, Wallet, Shield } from "lucide-react";
 import { StripeErrorBoundary } from "@/components/checkout/StripeErrorBoundary";
-
-// ── Module-level Stripe.js promise ──
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 );
 
-// ── Inner form that uses Stripe hooks ──
+// ── Inner Stripe Checkout Form ──
 
-function CheckoutForm({ returnUrl }: { returnUrl: string }) {
+function StripeCheckoutForm({
+  returnUrl,
+  amount,
+  brandColor,
+}: {
+  returnUrl: string;
+  amount: string;
+  brandColor?: string;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setIsLoading] = useState(false);
@@ -35,32 +42,23 @@ function CheckoutForm({ returnUrl }: { returnUrl: string }) {
 
     const { error } = await stripe.confirmPayment({
       elements,
-      confirmParams: {
-        return_url: returnUrl,
-      },
+      confirmParams: { return_url: returnUrl },
     });
 
     if (error) {
-      if (error.type === "card_error" || error.type === "validation_error") {
-        setMessage(error.message ?? "Erro no cartão");
-      } else {
-        setMessage("Ocorreu um erro inesperado. Tente novamente.");
-      }
+      setMessage(
+        error.type === "card_error" || error.type === "validation_error"
+          ? error.message ?? "Erro no cartão"
+          : "Ocorreu um erro inesperado. Tente novamente."
+      );
     }
-    // On success, Stripe redirects to returnUrl automatically
 
     setIsLoading(false);
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 mb-3">
-          <CreditCard className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-medium text-foreground">Dados do Cartão</p>
-        </div>
-        <PaymentElement options={{ layout: "tabs" }} />
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <PaymentElement options={{ layout: "tabs" }} />
 
       {message && (
         <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
@@ -70,7 +68,8 @@ function CheckoutForm({ returnUrl }: { returnUrl: string }) {
 
       <Button
         type="submit"
-        className="w-full h-11 text-sm font-semibold"
+        className="w-full h-12 text-sm font-semibold gap-2"
+        style={brandColor ? { backgroundColor: brandColor, color: "#fff" } : undefined}
         disabled={!stripe || !elements || isLoading}
       >
         {isLoading ? (
@@ -81,129 +80,194 @@ function CheckoutForm({ returnUrl }: { returnUrl: string }) {
         ) : (
           <>
             <Lock className="h-4 w-4" />
-            Pagar agora
+            Pagar agora — {amount}
           </>
         )}
       </Button>
 
       <div className="flex items-center justify-center gap-2 pt-1">
-        <Lock className="h-3 w-3 text-muted-foreground" />
+        <Shield className="h-3 w-3 text-muted-foreground" />
         <p className="text-[11px] text-muted-foreground">
-          Pagamento encriptado e seguro via Stripe
+          Pagamento encriptado via Stripe
         </p>
       </div>
     </form>
   );
 }
 
-// ── Fallback when Stripe key is not configured ──
+// ── Web3 / Crypto Placeholder ──
+
+function Web3Placeholder({ brandColor }: { brandColor?: string }) {
+  return (
+    <div className="py-10 sm:py-14 flex flex-col items-center text-center space-y-4">
+      {/* Glow icon */}
+      <div
+        className="relative flex items-center justify-center h-16 w-16 rounded-2xl"
+        style={{
+          backgroundColor: brandColor
+            ? `${brandColor}12`
+            : "rgba(255,255,255,0.04)",
+        }}
+      >
+        <Wallet
+          className="h-7 w-7"
+          style={{ color: brandColor || "var(--muted-foreground)" }}
+        />
+        {/* Subtle glow ring */}
+        <div
+          className="absolute inset-0 rounded-2xl opacity-40"
+          style={{
+            border: `1px solid ${brandColor || "var(--border)"}30`,
+          }}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="text-sm font-semibold text-foreground">
+          Pagamento Web3
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed max-w-[260px]">
+          Em breve poderá pagar com criptomoedas.
+          <br />
+          Conecte a sua Wallet Metamask.
+        </p>
+      </div>
+
+      {/* Metamask-style placeholder badge */}
+      <div className="flex items-center gap-2 rounded-full border border-border px-4 py-2">
+        <div className="h-5 w-5 rounded-full bg-[#F6851B]/10 flex items-center justify-center">
+          <Wallet className="h-3 w-3 text-[#F6851B]" />
+        </div>
+        <span className="text-xs text-muted-foreground font-medium">
+          Metamask
+        </span>
+        <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider ml-1">
+          Em breve
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Fallbacks ──
 
 function StripeKeyMissing() {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <CreditCard className="h-4 w-4 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">
-          Dados do Cartão
-        </p>
+    <div className="py-10 text-center space-y-3">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <CreditCard className="h-6 w-6 text-muted-foreground" />
       </div>
-      <div className="rounded-lg border bg-muted/30 p-5 sm:p-6 text-center space-y-3">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <CreditCard className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            Stripe Payment Element
-          </p>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-            Configure a variável{" "}
-            <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">
-              NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-            </code>{" "}
-            no ambiente de deploy para ativar o pagamento.
-          </p>
-        </div>
+      <div>
+        <p className="text-sm font-medium text-foreground">Stripe Payment Element</p>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+          Configure a variável{" "}
+          <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+          </code>{" "}
+          no ambiente de deploy.
+        </p>
       </div>
     </div>
   );
 }
-
-// ── Fallback when Stripe Elements crashes at runtime ──
 
 function StripeCrashFallback() {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <CreditCard className="h-4 w-4 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">
-          Dados do Cartão
-        </p>
+    <div className="py-10 text-center space-y-3">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
+        <AlertTriangle className="h-6 w-6 text-amber-500" />
       </div>
-      <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/20 p-5 sm:p-6 text-center space-y-3">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
-          <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            Aguardando configuração da Chave Stripe do Lojista
-          </p>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-            O Stripe não conseguiu inicializar o pagamento.
-            Isto geralmente ocorre quando a chave publicável ainda não foi
-            configurada para esta loja. Por favor, tente novamente mais tarde.
-          </p>
-        </div>
+      <div>
+        <p className="text-sm font-medium text-foreground">
+          Aguardando configuração do Gateway pelo Lojista
+        </p>
+        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+          O Stripe não conseguiu inicializar o pagamento.
+          Tente novamente mais tarde.
+        </p>
       </div>
     </div>
   );
 }
 
-// ── Wrapper: provides Elements context, wrapped in ErrorBoundary ──
+// ── Main Wrapper: Tabs (Card/Fiat + Web3) ──
 
 interface StripePaymentFormProps {
   clientSecret: string;
   returnUrl: string;
   brandColor?: string;
+  amount?: string;
 }
 
 export function StripePaymentForm({
   clientSecret,
   returnUrl,
   brandColor,
+  amount = "",
 }: StripePaymentFormProps) {
   const options: StripeElementsOptions = useMemo(
     () => ({
       clientSecret,
-      appearance: brandColor
-        ? {
-            theme: "stripe",
-            variables: {
-              colorPrimary: brandColor,
-              colorBackground: "#ffffff",
-              colorText: "#1a1a1a",
-              colorDanger: "#ef4444",
-              fontFamily:
-                "var(--font-geist-sans), system-ui, sans-serif",
-              borderRadius: "8px",
-            },
-          }
-        : undefined,
+      appearance: {
+        theme: "night" as const,
+        variables: {
+          colorPrimary: brandColor || "#6366f1",
+          colorBackground: "#09090b",
+          colorText: "#fafafa",
+          colorTextSecondary: "#a1a1aa",
+          colorDanger: "#ef4444",
+          fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
+          borderRadius: "8px",
+          spacingBranding: "none",
+        },
+        rules: {
+          ".Label": { color: "#a1a1aa", fontSize: "12px", fontWeight: "500" },
+          ".Input": { backgroundColor: "#09090b", borderColor: "#27272a" },
+          ".Input:focus": { borderColor: brandColor || "#6366f1" },
+          ".Tab": { color: "#a1a1aa" },
+          ".Tab:hover": { color: "#fafafa" },
+          ".Tab--selected": { color: "#fafafa", borderColor: brandColor || "#6366f1" },
+        },
+      },
     }),
     [clientSecret, brandColor]
   );
 
-  // Missing Stripe key → show setup notice (no crash)
   if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
     return <StripeKeyMissing />;
   }
 
-  // Stripe key exists but may fail at render time (invalid clientSecret, etc.)
-  // → wrap in ErrorBoundary to prevent white screen
   return (
-    <StripeErrorBoundary fallback={<StripeCrashFallback />}>
-      <Elements stripe={stripePromise} options={options}>
-        <CheckoutForm returnUrl={returnUrl} />
-      </Elements>
-    </StripeErrorBoundary>
+    <Tabs defaultValue="card" className="w-full">
+      <TabsList className="w-full h-11 bg-muted/50 p-1">
+        <TabsTrigger value="card" className="flex-1 gap-2 h-9 text-xs font-medium data-[state=active]:bg-card">
+          <CreditCard className="h-3.5 w-3.5" />
+          Cartão / Pagamento
+        </TabsTrigger>
+        <TabsTrigger
+          value="web3"
+          className="flex-1 gap-2 h-9 text-xs font-medium data-[state=active]:bg-card opacity-60 pointer-events-none select-none"
+        >
+          <Wallet className="h-3.5 w-3.5" />
+          Web3 / Crypto
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="card" className="mt-5">
+        <StripeErrorBoundary fallback={<StripeCrashFallback />}>
+          <Elements stripe={stripePromise} options={options}>
+            <StripeCheckoutForm
+              returnUrl={returnUrl}
+              amount={amount}
+              brandColor={brandColor}
+            />
+          </Elements>
+        </StripeErrorBoundary>
+      </TabsContent>
+
+      <TabsContent value="web3" className="mt-2">
+        <Web3Placeholder brandColor={brandColor} />
+      </TabsContent>
+    </Tabs>
   );
 }

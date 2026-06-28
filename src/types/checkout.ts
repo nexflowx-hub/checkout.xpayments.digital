@@ -14,6 +14,7 @@ export interface PaymentLinkData {
   amountFiat: number;
   currency: string;
   branding: Branding;
+  productImage?: string;
 }
 
 export interface PaymentLinkResponse {
@@ -26,7 +27,11 @@ export interface PaymentLinkResponse {
 export interface CustomerDetails {
   fullName: string;
   email: string;
+  phone?: string;
   country: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
 }
 
 export interface InitiateCheckoutRequest {
@@ -101,6 +106,24 @@ export function getPixCode(data: PixCheckoutData): string {
 export function isQrCodeImage(qrCode: string | undefined): boolean {
   if (!qrCode) return false;
   return qrCode.startsWith("http") || qrCode.startsWith("data:");
+}
+
+/** Auto-detect country from browser language */
+export function detectCountry(): string {
+  try {
+    const lang = navigator.language || "pt-PT";
+    const parts = lang.split("-");
+    if (parts.length > 1) return parts[1].toUpperCase();
+    const code = parts[0].toLowerCase();
+    if (code === "pt") return "BR";
+    if (code === "es") return "ES";
+    if (code === "en") return "US";
+    if (code === "fr") return "FR";
+    if (code === "de") return "DE";
+    return "PT";
+  } catch {
+    return "PT";
+  }
 }
 
 export function formatCurrency(amount: number, currency: string): string {

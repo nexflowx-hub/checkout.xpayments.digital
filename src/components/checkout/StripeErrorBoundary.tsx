@@ -4,7 +4,7 @@ import {
   Component,
   type ReactNode,
 } from "react";
-import { CreditCard, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 interface StripeErrorBoundaryProps {
   children: ReactNode;
@@ -50,26 +50,18 @@ export class StripeErrorBoundary extends Component<
 
 function DefaultStripeFallback() {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <CreditCard className="h-4 w-4 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">
-          Dados do Cartão
-        </p>
+    <div className="py-10 text-center space-y-3">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
+        <AlertTriangle className="h-6 w-6 text-amber-500" />
       </div>
-      <div className="rounded-lg border bg-muted/30 p-6 text-center space-y-3">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/30">
-          <AlertTriangle className="h-6 w-6 text-amber-500" />
-        </div>
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">
-            Aguardando configuração da Chave Stripe
-          </p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            O lojista ainda não configurou a chave Stripe publicável.
-            Por favor, contacte o suporte ou tente novamente mais tarde.
-          </p>
-        </div>
+      <div className="space-y-1.5">
+        <p className="text-sm font-medium text-foreground">
+          Aguardando configuração do Gateway pelo Lojista
+        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          O Stripe não conseguiu inicializar o pagamento.
+          Tente novamente mais tarde.
+        </p>
       </div>
     </div>
   );

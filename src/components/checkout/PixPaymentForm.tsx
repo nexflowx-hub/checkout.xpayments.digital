@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Clock, QrCode, Smartphone, RefreshCw } from "lucide-react";
+import { Copy, Check, Clock, QrCode, Smartphone, RefreshCw, Shield } from "lucide-react";
 import type { PixCheckoutData, PaymentLinkData } from "@/types/checkout";
 import { formatCurrency, getPixCode, isQrCodeImage } from "@/types/checkout";
 
@@ -28,7 +28,6 @@ export function PixPaymentForm({
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [imgError, setImgError] = useState(false);
 
-  // Determine QR display strategy
   const hasQrImage = isQrCodeImage(qrCode) && !imgError;
 
   // Countdown timer
@@ -60,7 +59,6 @@ export function PixPaymentForm({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Fallback for older browsers
       const textarea = document.createElement("textarea");
       textarea.value = pixCode;
       textarea.style.position = "fixed";
@@ -77,13 +75,12 @@ export function PixPaymentForm({
   const isExpired = timeLeft === "Expirado";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* QR Code */}
-      <div className="flex flex-col items-center gap-3 sm:gap-4">
+      <div className="flex flex-col items-center gap-4">
         <div className="relative">
-          <div className="bg-white p-3 sm:p-4 rounded-2xl border shadow-sm">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-lg shadow-black/20">
             {hasQrImage ? (
-              // Backend provided QR as image (URL or base64)
               <img
                 src={qrCode}
                 alt="QR Code PIX"
@@ -91,7 +88,6 @@ export function PixPaymentForm({
                 onError={() => setImgError(true)}
               />
             ) : (
-              // Generate QR locally from pixString
               <QRCodeSVG
                 value={pixCode}
                 size={200}
@@ -103,7 +99,7 @@ export function PixPaymentForm({
             )}
           </div>
           {isExpired && (
-            <div className="absolute inset-0 bg-background/80 rounded-2xl flex flex-col items-center justify-center gap-2">
+            <div className="absolute inset-0 bg-background/85 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-2">
               <Clock className="h-6 w-6 text-destructive" />
               <p className="text-sm font-medium text-destructive">QR Expirado</p>
             </div>
@@ -135,8 +131,9 @@ export function PixPaymentForm({
           </span>
         </Badge>
         <Badge
-          variant="secondary"
           className="text-xs font-semibold px-3 py-1"
+          style={{ backgroundColor: `${brandColor}18`, color: brandColor, borderColor: `${brandColor}30` }}
+          variant="outline"
         >
           {formatCurrency(paymentLink.amountFiat, paymentLink.currency)}
         </Badge>
@@ -152,7 +149,7 @@ export function PixPaymentForm({
             </p>
           </div>
           <div className="flex gap-2">
-            <div className="flex-1 bg-muted/50 border rounded-lg px-3 py-2.5 text-[11px] sm:text-xs text-muted-foreground font-mono truncate select-all min-w-0">
+            <div className="flex-1 bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-[11px] sm:text-xs text-muted-foreground font-mono truncate select-all min-w-0">
               {pixCode}
             </div>
             <Button
@@ -165,8 +162,8 @@ export function PixPaymentForm({
             >
               {copied ? (
                 <>
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span className="text-green-600 hidden sm:inline">Copiado</span>
+                  <Check className="h-4 w-4 text-green-400" />
+                  <span className="text-green-400 hidden sm:inline">Copiado</span>
                 </>
               ) : (
                 <>
@@ -179,7 +176,7 @@ export function PixPaymentForm({
         </div>
       )}
 
-      {/* Expired — retry */}
+      {/* Expired retry */}
       {isExpired && (
         <Button
           type="button"
@@ -192,9 +189,12 @@ export function PixPaymentForm({
         </Button>
       )}
 
-      <p className="text-[11px] text-center text-muted-foreground">
-        Após o pagamento, a página será atualizada automaticamente.
-      </p>
+      <div className="flex items-center justify-center gap-2 pt-1">
+        <Shield className="h-3 w-3 text-muted-foreground" />
+        <p className="text-[11px] text-muted-foreground">
+          Após o pagamento, a página será atualizada automaticamente.
+        </p>
+      </div>
     </div>
   );
 }
