@@ -43,6 +43,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.title": "Pagamento Confirmado!",
     "success.thanks": "Obrigado pela sua compra em",
     "success.email": "Enviámos um email de confirmação com os detalhes do pedido.",
+    "success.redirecting": "A redirecionar de volta para a loja em {seconds} segundos...",
+    "success.redirectNow": "Redirecionar agora",
+    "success.closeWindow": "Pode fechar esta janela",
+    "success.closeDesc": "A transação foi concluída com segurança.",
 
     // Error
     "error.title": "Ops!",
@@ -134,6 +138,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.title": "Payment Confirmed!",
     "success.thanks": "Thank you for your purchase at",
     "success.email": "We sent a confirmation email with the order details.",
+    "success.redirecting": "Redirecting back to the store in {seconds} seconds...",
+    "success.redirectNow": "Redirect now",
+    "success.closeWindow": "You can close this window",
+    "success.closeDesc": "The transaction has been completed safely.",
 
     // Error
     "error.title": "Oops!",
@@ -225,6 +233,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.title": "¡Pago Confirmado!",
     "success.thanks": "Gracias por tu compra en",
     "success.email": "Hemos enviado un email de confirmación con los detalles del pedido.",
+    "success.redirecting": "Redirigiendo de vuelta a la tienda en {seconds} segundos...",
+    "success.redirectNow": "Redirigir ahora",
+    "success.closeWindow": "Puede cerrar esta ventana",
+    "success.closeDesc": "La transacción se ha completado con seguridad.",
 
     // Error
     "error.title": "¡Ups!",

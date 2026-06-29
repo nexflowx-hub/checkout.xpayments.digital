@@ -114,35 +114,113 @@ function CheckoutSkeleton() {
 
 // ── Success Screen ──
 
+const REDIRECT_SECONDS = 3;
+
 function SuccessScreen({
-  brandColor,
   storeName,
+  successUrl,
 }: {
-  brandColor: string;
   storeName: string;
+  successUrl?: string;
 }) {
   const { t } = useI18n();
+  const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
+
+  // Countdown redirect
+  useEffect(() => {
+    if (!successUrl) return;
+    if (countdown <= 0) {
+      window.location.href = successUrl;
+      return;
+    }
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown, successUrl]);
+
+  // Manual redirect
+  const handleRedirectNow = useCallback(() => {
+    if (successUrl) window.location.href = successUrl;
+  }, [successUrl]);
+
+  // Close window
+  const handleClose = useCallback(() => {
+    try { window.close(); } catch {}
+  }, []);
+
+  const hasRedirect = !!successUrl;
+  const progressPct = hasRedirect ? ((REDIRECT_SECONDS - countdown) / REDIRECT_SECONDS) * 100 : 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="text-center space-y-5 max-w-sm w-full">
-        <div
-          className="mx-auto flex items-center justify-center h-16 w-16 rounded-full"
-          style={{ backgroundColor: `${brandColor}18` }}
-        >
-          <CheckCircle2 className="h-8 w-8" style={{ color: brandColor }} />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-xl font-bold text-foreground">
-            {t("success.title")}
-          </h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {t("success.thanks")}{" "}
-            <span className="text-foreground font-medium">{storeName}</span>.
-          </p>
-        </div>
-        <p className="text-xs text-muted-foreground">{t("success.email")}</p>
+    <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center space-y-6">
+      {/* Animated checkmark */}
+      <div
+        className="relative flex items-center justify-center h-20 w-20 rounded-full animate-[success-pop_0.5s_ease-out]"
+        style={{ backgroundColor: "#22c55e15" }}
+      >
+        <CheckCircle2 className="h-10 w-10" style={{ color: "#22c55e" }} />
       </div>
+
+      {/* Title + store name */}
+      <div className="space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          {t("success.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {t("success.thanks")}{" "}
+          <span className="text-foreground font-medium">{storeName}</span>.
+        </p>
+      </div>
+
+      {/* Email confirmation note */}
+      <p className="text-xs text-muted-foreground max-w-[300px]">
+        {t("success.email")}
+      </p>
+
+      {/* ── Redirect block (has successUrl) ── */}
+      {hasRedirect && (
+        <div className="w-full max-w-[320px] space-y-3 pt-1">
+          {/* Progress bar */}
+          <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-1000 ease-linear"
+              style={{
+                width: `${progressPct}%`,
+                backgroundColor: "#22c55e",
+              }}
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {t("success.redirecting").replace("{seconds}", String(countdown))}
+          </p>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-10 text-xs font-medium gap-2"
+            onClick={handleRedirectNow}
+          >
+            {t("success.redirectNow")}
+          </Button>
+        </div>
+      )}
+
+      {/* ── Close window block (no successUrl) ── */}
+      {!hasRedirect && (
+        <div className="w-full max-w-[320px] space-y-3 pt-1">
+          <p className="text-xs text-muted-foreground">
+            {t("success.closeDesc")}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full h-10 text-xs font-medium"
+            onClick={handleClose}
+          >
+            {t("success.closeWindow")}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -254,7 +332,10 @@ function CheckoutPageInner() {
       <div className="min-h-screen flex flex-col bg-background">
         <CheckoutHeader branding={branding} brandColor={brandColor} />
         <main className="flex-1 flex items-center justify-center px-4">
-          <SuccessScreen brandColor={brandColor} storeName={branding.storeName} />
+          <SuccessScreen
+            storeName={branding.storeName}
+            successUrl={branding.successUrl || undefined}
+          />
         </main>
         <CheckoutFooter />
       </div>
