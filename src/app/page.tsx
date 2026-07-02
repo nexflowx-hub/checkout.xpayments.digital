@@ -112,7 +112,7 @@ export default function Home() {
               <div className="rounded-lg border border-border/40 p-4 space-y-2">
                 <p className="text-xs font-medium text-foreground">Checkout Route</p>
                 <code className="block text-xs text-muted-foreground bg-muted/40 rounded px-3 py-2 font-mono">
-                  /pay/:urlCode → fetch Master Backend → render gateway
+                  /pay/:sessionId → fetch Master Backend → render gateway
                 </code>
               </div>
             </CardContent>
