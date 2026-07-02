@@ -21,9 +21,9 @@ import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
 import { ThemeToggle } from "@/components/checkout/ThemeToggle";
 import { LanguageSelector } from "@/components/checkout/LanguageSelector";
 import { I18nProvider, useI18n } from "@/lib/i18n";
-import { fetchPaymentLink, initiateCheckout } from "@/lib/api-client";
+import { getSession, initiateCheckout } from "@/lib/api-client";
 import type {
-  PaymentLinkData,
+  CheckoutSession,
   CustomerDetails,
   CheckoutData,
 } from "@/types/checkout";
@@ -54,7 +54,7 @@ interface CheckoutResult {
   checkoutData: CheckoutData;
 }
 
-// ── Minimal Header (no branding data needed) ──
+// ── Minimal Header (no session data needed) ──
 
 function MinimalHeader() {
   return (
@@ -114,34 +114,73 @@ function CheckoutSkeleton() {
 
 // ── Success Screen ──
 
+const REDIRECT_SECONDS = 3;
+
 function SuccessScreen({
-  brandColor,
   storeName,
 }: {
-  brandColor: string;
   storeName: string;
 }) {
   const { t } = useI18n();
+  const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
+
+  // Close window
+  const handleClose = useCallback(() => {
+    try { window.close(); } catch {}
+  }, []);
+
+  const progressPct = ((REDIRECT_SECONDS - countdown) / REDIRECT_SECONDS) * 100;
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="text-center space-y-5 max-w-sm w-full">
-        <div
-          className="mx-auto flex items-center justify-center h-16 w-16 rounded-full"
-          style={{ backgroundColor: `${brandColor}18` }}
+    <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center space-y-6">
+      {/* Animated checkmark */}
+      <div
+        className="relative flex items-center justify-center h-20 w-20 rounded-full animate-[success-pop_0.5s_ease-out]"
+        style={{ backgroundColor: "#22c55e15" }}
+      >
+        <CheckCircle2 className="h-10 w-10" style={{ color: "#22c55e" }} />
+      </div>
+
+      {/* Title + store name */}
+      <div className="space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+          {t("success.title")}
+        </h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {t("success.thanks")}{" "}
+          <span className="text-foreground font-medium">{storeName}</span>.
+        </p>
+      </div>
+
+      {/* Email confirmation note */}
+      <p className="text-xs text-muted-foreground max-w-[300px]">
+        {t("success.email")}
+      </p>
+
+      {/* Progress bar */}
+      <div className="w-full max-w-[320px] space-y-3 pt-1">
+        <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-1000 ease-linear"
+            style={{
+              width: `${progressPct}%`,
+              backgroundColor: "#22c55e",
+            }}
+          />
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {t("success.closeDesc")}
+        </p>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-10 text-xs font-medium"
+          onClick={handleClose}
         >
-          <CheckCircle2 className="h-8 w-8" style={{ color: brandColor }} />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-xl font-bold text-foreground">
-            {t("success.title")}
-          </h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {t("success.thanks")}{" "}
-            <span className="text-foreground font-medium">{storeName}</span>.
-          </p>
-        </div>
-        <p className="text-xs text-muted-foreground">{t("success.email")}</p>
+          {t("success.closeWindow")}
+        </Button>
       </div>
     </div>
   );
@@ -177,10 +216,10 @@ function ErrorScreen({ message }: { message: string }) {
 
 function CheckoutPageInner() {
   const { t } = useI18n();
-  const params = useParams<{ urlCode: string }>();
+  const params = useParams<{ sessionId: string }>();
   const paymentStatus = usePaymentStatus();
 
-  const [paymentLink, setPaymentLink] = useState<PaymentLinkData | null>(null);
+  const [session, setSession] = useState<CheckoutSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,31 +229,29 @@ function CheckoutPageInner() {
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
-  // Fetch payment link
+  // Fetch session
   useEffect(() => {
-    fetchPaymentLink(params.urlCode)
-      .then(setPaymentLink)
+    getSession(params.sessionId)
+      .then(setSession)
       .catch((err) => {
         console.error("[checkout] fetch error:", err);
         setError(err.message || t("error.loadFailed"));
       })
       .finally(() => setLoading(false));
-  }, [params.urlCode, t]);
+  }, [params.sessionId, t]);
 
-  // Submit customer details
+  // Submit customer details — CRITICAL: only sessionId + customerDetails, NO price/currency
   const handleCustomerSubmit = useCallback(
     async (customerDetails: CustomerDetails) => {
-      if (!paymentLink) return;
+      if (!session) return;
       setInitiating(true);
       setInitiateError(null);
 
       try {
-        const result = await initiateCheckout(
-          paymentLink.storeId,
-          paymentLink.amountFiat,
-          paymentLink.currency,
-          customerDetails
-        );
+        const result = await initiateCheckout({
+          sessionId: params.sessionId,
+          customerDetails,
+        });
         setCheckoutResult(result);
         setStep("payment");
       } catch (err) {
@@ -226,7 +263,7 @@ function CheckoutPageInner() {
         setInitiating(false);
       }
     },
-    [paymentLink, t]
+    [session, params.sessionId, t]
   );
 
   const handleGoBack = useCallback(() => {
@@ -236,25 +273,29 @@ function CheckoutPageInner() {
   }, []);
 
   const handlePixSuccess = useCallback(() => {
-    window.location.href = `/pay/${params.urlCode}?status=success`;
-  }, [params.urlCode]);
+    window.location.href = `/pay/${params.sessionId}?status=success`;
+  }, [params.sessionId]);
 
   // ── Render states ──
 
   if (loading) return <CheckoutSkeleton />;
   if (error) return <ErrorScreen message={error} />;
-  if (!paymentLink) return <ErrorScreen message={t("error.notFound")} />;
+  if (!session) return <ErrorScreen message={t("error.notFound")} />;
 
-  const { branding } = paymentLink;
-  const brandColor = branding.color || "#111111";
+  // Block access if session is not OPEN
+  if (session.status !== "OPEN" && paymentStatus !== "success") {
+    return <ErrorScreen message={t("error.notFound")} />;
+  }
+
+  const brandColor = session.primaryColor || "#111111";
 
   // Success screen
   if (paymentStatus === "success") {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <CheckoutHeader branding={branding} brandColor={brandColor} />
+        <CheckoutHeader session={session} brandColor={brandColor} />
         <main className="flex-1 flex items-center justify-center px-4">
-          <SuccessScreen brandColor={brandColor} storeName={branding.storeName} />
+          <SuccessScreen storeName={session.storeName} />
         </main>
         <CheckoutFooter />
       </div>
@@ -274,24 +315,21 @@ function CheckoutPageInner() {
       ? checkoutResult.checkoutData
       : null;
 
-  const returnUrl =
-    branding.successUrl ||
-    `${window.location.origin}/pay/${params.urlCode}?status=success`;
-
-  const amountStr = formatCurrency(paymentLink.amountFiat, paymentLink.currency);
+  const returnUrl = `${window.location.origin}/pay/${params.sessionId}?status=success`;
+  const amountStr = formatCurrency(session.amountFiat, session.currency);
 
   // ── STEP 1: Lead Capture ──
   if (step === "customer_details") {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <CheckoutHeader branding={branding} brandColor={brandColor} />
+        <CheckoutHeader session={session} brandColor={brandColor} />
 
         <main className="flex-1 px-3 sm:px-4 py-4 sm:py-8">
           <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6 items-start">
             {/* Left: Order Summary (desktop) */}
             <div className="hidden lg:block lg:col-span-2">
               <div className="rounded-xl border border-border/50 bg-card sticky top-20">
-                <OrderSummary paymentLink={paymentLink} brandColor={brandColor} />
+                <OrderSummary session={session} brandColor={brandColor} />
               </div>
             </div>
 
@@ -301,7 +339,7 @@ function CheckoutPageInner() {
                 {/* Mobile order summary */}
                 <div className="lg:hidden mb-6 p-4 rounded-lg bg-muted/30 border border-border/30">
                   <CompactOrderSummary
-                    paymentLink={paymentLink}
+                    session={session}
                     brandColor={brandColor}
                   />
                 </div>
@@ -339,7 +377,7 @@ function CheckoutPageInner() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <CheckoutHeader
-        branding={branding}
+        session={session}
         brandColor={brandColor}
         onBack={handleGoBack}
         showBack
@@ -351,7 +389,7 @@ function CheckoutPageInner() {
             {/* Compact order bar */}
             <div className="px-5 sm:px-6 py-4 border-b border-border/50 bg-muted/20">
               <CompactOrderSummary
-                paymentLink={paymentLink}
+                session={session}
                 brandColor={brandColor}
               />
             </div>
@@ -408,7 +446,7 @@ function CheckoutPageInner() {
                 <PixPaymentForm
                   checkoutData={pixData}
                   brandColor={brandColor}
-                  paymentLink={paymentLink}
+                  session={session}
                   onSuccess={handlePixSuccess}
                 />
               ) : (
@@ -437,12 +475,12 @@ export default function CheckoutPage() {
 // ── Sub-components ──
 
 function CheckoutHeader({
-  branding,
+  session,
   brandColor,
   onBack,
   showBack,
 }: {
-  branding: { storeName: string; logo?: string };
+  session: CheckoutSession;
   brandColor: string;
   onBack?: () => void;
   showBack?: boolean;
@@ -463,10 +501,10 @@ function CheckoutHeader({
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
-          {branding.logo ? (
+          {session.logoUrl ? (
             <img
-              src={branding.logo}
-              alt={branding.storeName}
+              src={session.logoUrl}
+              alt={session.storeName}
               className="h-6 w-auto sm:h-7 max-w-[120px] sm:max-w-[140px] object-contain"
             />
           ) : (
@@ -475,10 +513,10 @@ function CheckoutHeader({
                 className="h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0"
                 style={{ backgroundColor: brandColor }}
               >
-                {branding.storeName.slice(0, 2).toUpperCase()}
+                {session.storeName.slice(0, 2).toUpperCase()}
               </div>
               <span className="font-semibold text-xs sm:text-sm text-foreground truncate">
-                {branding.storeName}
+                {session.storeName}
               </span>
             </div>
           )}

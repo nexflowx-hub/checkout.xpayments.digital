@@ -43,6 +43,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.title": "Pagamento Confirmado!",
     "success.thanks": "Obrigado pela sua compra em",
     "success.email": "Enviámos um email de confirmação com os detalhes do pedido.",
+    "success.closeWindow": "Pode fechar esta janela",
+    "success.closeDesc": "A transação foi concluída com segurança.",
 
     // Error
     "error.title": "Ops!",
@@ -103,6 +105,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Order
     "order.secureCheckout": "Checkout seguro",
+    "order.payment": "Pagamento",
     "order.unit": "1x Unidade",
     "order.total": "Total",
     "order.securePayment": "Pagamento seguro",
@@ -134,6 +137,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.title": "Payment Confirmed!",
     "success.thanks": "Thank you for your purchase at",
     "success.email": "We sent a confirmation email with the order details.",
+    "success.closeWindow": "You can close this window",
+    "success.closeDesc": "The transaction has been completed safely.",
 
     // Error
     "error.title": "Oops!",
@@ -194,6 +199,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Order
     "order.secureCheckout": "Secure checkout",
+    "order.payment": "Payment",
     "order.unit": "1x Unit",
     "order.total": "Total",
     "order.securePayment": "Secure payment",
@@ -225,6 +231,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.title": "¡Pago Confirmado!",
     "success.thanks": "Gracias por tu compra en",
     "success.email": "Hemos enviado un email de confirmación con los detalles del pedido.",
+    "success.closeWindow": "Puede cerrar esta ventana",
+    "success.closeDesc": "La transacción se ha completado con seguridad.",
 
     // Error
     "error.title": "¡Ups!",
@@ -285,6 +293,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Order
     "order.secureCheckout": "Checkout seguro",
+    "order.payment": "Pago",
     "order.unit": "1x Unidad",
     "order.total": "Total",
     "order.securePayment": "Pago seguro",

@@ -5,21 +5,21 @@ import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Clock, QrCode, Smartphone, RefreshCw, Shield } from "lucide-react";
-import type { PixCheckoutData, PaymentLinkData } from "@/types/checkout";
+import type { PixCheckoutData, CheckoutSession } from "@/types/checkout";
 import { formatCurrency, getPixCode, isQrCodeImage } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
 
 interface PixPaymentFormProps {
   checkoutData: PixCheckoutData;
   brandColor: string;
-  paymentLink: PaymentLinkData;
+  session: CheckoutSession;
   onSuccess: () => void;
 }
 
 export function PixPaymentForm({
   checkoutData,
   brandColor,
-  paymentLink,
+  session,
   onSuccess,
 }: PixPaymentFormProps) {
   const { t } = useI18n();
@@ -136,7 +136,7 @@ export function PixPaymentForm({
           style={{ backgroundColor: `${brandColor}18`, color: brandColor, borderColor: `${brandColor}30` }}
           variant="outline"
         >
-          {formatCurrency(paymentLink.amountFiat, paymentLink.currency)}
+          {formatCurrency(session.amountFiat, session.currency)}
         </Badge>
       </div>
 

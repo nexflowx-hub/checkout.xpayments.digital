@@ -1,28 +1,19 @@
-// ── Payment Link (PASSO A) ──
+// ── Checkout Session (Server-to-Server V2) ──
 
-export interface Branding {
-  storeName: string;
-  logo?: string;
-  color: string;
-  successUrl?: string;
-}
+export type SessionStatus = "OPEN" | "COMPLETED" | "EXPIRED";
 
-export interface PaymentLinkData {
-  id: string;
-  storeId: string;
-  name: string;
+export interface CheckoutSession {
+  sessionId: string;
+  storeId?: string;
   amountFiat: number;
   currency: string;
-  branding: Branding;
-  productImage?: string;
+  storeName: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  status: SessionStatus;
 }
 
-export interface PaymentLinkResponse {
-  success: boolean;
-  data: PaymentLinkData;
-}
-
-// ── Customer Details (PASSO B) ──
+// ── Customer Details ──
 
 export interface CustomerDetails {
   fullName: string;
@@ -34,14 +25,7 @@ export interface CustomerDetails {
   city?: string;
 }
 
-export interface InitiateCheckoutRequest {
-  storeId: string;
-  amountFiat: number;
-  currency: string;
-  customerDetails: CustomerDetails;
-}
-
-// ── Gateway Response (PASSO C) ──
+// ── Gateway Response ──
 
 export type GatewayType = string;
 
@@ -69,10 +53,6 @@ export interface InitiateCheckoutResponse {
     checkoutData: CheckoutData;
   };
 }
-
-// ── Checkout Steps ──
-
-export type CheckoutStep = "customer_details" | "payment";
 
 // ── Helpers ──
 
@@ -106,24 +86,6 @@ export function getPixCode(data: PixCheckoutData): string {
 export function isQrCodeImage(qrCode: string | undefined): boolean {
   if (!qrCode) return false;
   return qrCode.startsWith("http") || qrCode.startsWith("data:");
-}
-
-/** Auto-detect country from browser language */
-export function detectCountry(): string {
-  try {
-    const lang = navigator.language || "pt-PT";
-    const parts = lang.split("-");
-    if (parts.length > 1) return parts[1].toUpperCase();
-    const code = parts[0].toLowerCase();
-    if (code === "pt") return "BR";
-    if (code === "es") return "ES";
-    if (code === "en") return "US";
-    if (code === "fr") return "FR";
-    if (code === "de") return "DE";
-    return "PT";
-  } catch {
-    return "PT";
-  }
 }
 
 export function formatCurrency(amount: number, currency: string): string {
