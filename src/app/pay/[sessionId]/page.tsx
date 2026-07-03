@@ -229,24 +229,20 @@ function CheckoutPageInner() {
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
-  // Fetch session — defensive: guard against undefined params, flexible payload
+  // Fetch session — defensive: guard against undefined params
   useEffect(() => {
     async function load() {
-      if (!params?.sessionId) {
-        console.warn("[checkout] sessionId is undefined — router not ready yet");
+      const sid = params?.sessionId;
+      if (!sid) {
+        console.warn("[checkout] sessionId is undefined — router not ready");
         return;
       }
 
       try {
-        console.log("[checkout] 1. Fetching session with ID:", params.sessionId);
-        const data = await getSession(params.sessionId);
-        console.log("[checkout] 2. Session data extracted:", JSON.stringify(data, null, 2));
-
-        if (data && (data.amountFiat || typeof (data as Record<string, unknown>).amount === "number")) {
-          setSession(data);
-        } else {
-          throw new Error("Payload recebido não possui as propriedades de valor esperadas.");
-        }
+        console.log("[checkout] 1. Fetching session:", sid);
+        const data = await getSession(sid);
+        console.log("[checkout] 2. Normalised session:", JSON.stringify(data, null, 2));
+        setSession(data);
       } catch (err) {
         console.error("[checkout] Fetch failed:", err);
         setError(err instanceof Error ? err.message : t("error.loadFailed"));
@@ -300,8 +296,8 @@ function CheckoutPageInner() {
   if (error) return <ErrorScreen message={error} />;
   if (!session) return <ErrorScreen message={t("error.notFound")} />;
 
-  // Block access if session is not OPEN
-  if (session.status !== "OPEN" && paymentStatus !== "success") {
+  // Block access if session is explicitly not OPEN (tolerates missing status — normalised to OPEN)
+  if (session.status && session.status !== "OPEN" && paymentStatus !== "success") {
     return <ErrorScreen message={t("error.notFound")} />;
   }
 

@@ -12,6 +12,32 @@ const API_URL = process.env.NEXT_PUBLIC_MASTER_API || "https://api.xpayments.dig
 // All endpoints must include the /api/v1 prefix
 const v1 = (endpoint: string) => `${API_URL}/api/v1${endpoint}`;
 
+/**
+ * Normalise a raw backend payload into a valid CheckoutSession.
+ * The backend may omit `sessionId` and `status` — we supply safe defaults
+ * so the UI never crashes on a partial response.
+ */
+function normalizeSession(
+  raw: Record<string, unknown>,
+  fallbackId: string
+): CheckoutSession {
+  const session: CheckoutSession = {
+    // Backend may return `amount` instead of `amountFiat`
+    amountFiat: (raw.amountFiat as number) ?? (raw.amount as number) ?? 0,
+    currency: (raw.currency as string) ?? "EUR",
+    storeName: (raw.storeName as string) ?? "Store",
+    sessionId: (raw.sessionId as string) ?? fallbackId,
+    status: ((raw.status as string) ?? "OPEN") as CheckoutSession["status"],
+  };
+
+  // Optional fields — only copy if present
+  if (raw.storeId != null) session.storeId = raw.storeId as string;
+  if (raw.logoUrl != null && raw.logoUrl !== "null") session.logoUrl = raw.logoUrl as string;
+  if (raw.primaryColor != null) session.primaryColor = raw.primaryColor as string;
+
+  return session;
+}
+
 // ── Get Checkout Session ──
 
 export async function getSession(
@@ -29,22 +55,17 @@ export async function getSession(
     throw new Error(raw.message || raw.error || `Erro ${res.status} na consulta da API`);
   }
 
-  // Backend may wrap the session under `data`, `session`, or return it directly
-  const sessionData: CheckoutSession =
-    raw.data ?? raw.session ?? raw;
+  // Backend may wrap under `data`, `session`, or return directly
+  const envelope = (raw.data ?? raw.session ?? raw) as Record<string, unknown>;
 
   // Minimal validation: must contain an amount field
-  if (!sessionData || !(sessionData.amountFiat || typeof (sessionData as Record<string, unknown>).amount === "number")) {
+  if (!envelope || !(envelope.amountFiat || typeof envelope.amount === "number")) {
     console.error("[api-client] Raw response:", JSON.stringify(raw, null, 2));
     throw new Error("Payload recebido não possui as propriedades de valor esperadas.");
   }
 
-  // Normalise: if backend uses `amount` instead of `amountFiat`, map it
-  if (!sessionData.amountFiat && typeof (sessionData as Record<string, unknown>).amount === "number") {
-    sessionData.amountFiat = (sessionData as Record<string, unknown>).amount as number;
-  }
-
-  return sessionData;
+  console.log("[api-client] Normalising session:", JSON.stringify(envelope, null, 2));
+  return normalizeSession(envelope, sessionId);
 }
 
 // ── Initiate Checkout (POST) — Server decides price/currency ──
