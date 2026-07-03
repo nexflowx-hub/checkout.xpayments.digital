@@ -105,6 +105,7 @@ export function CompactOrderSummary({
   session: CheckoutSession;
   brandColor: string;
 }) {
+  const { t } = useI18n();
   const { storeName, logoUrl, amountFiat, currency } = session;
 
   return (
