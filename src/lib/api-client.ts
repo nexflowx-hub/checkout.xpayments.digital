@@ -17,18 +17,34 @@ const v1 = (endpoint: string) => `${API_URL}/api/v1${endpoint}`;
 export async function getSession(
   sessionId: string
 ): Promise<CheckoutSession> {
-  const res = await fetch(
-    v1(`/checkout/session/${sessionId}`),
-    { cache: "no-store" }
-  );
+  if (!sessionId) throw new Error("ID de sessão em falta.");
 
-  const json = await res.json();
+  const res = await fetch(v1(`/checkout/session/${sessionId}`), {
+    cache: "no-store",
+  });
 
-  if (!json.success) {
-    throw new Error(json.error || "Sessão de checkout inválida");
+  const raw = await res.json();
+
+  if (!res.ok) {
+    throw new Error(raw.message || raw.error || `Erro ${res.status} na consulta da API`);
   }
 
-  return json.data;
+  // Backend may wrap the session under `data`, `session`, or return it directly
+  const sessionData: CheckoutSession =
+    raw.data ?? raw.session ?? raw;
+
+  // Minimal validation: must contain an amount field
+  if (!sessionData || !(sessionData.amountFiat || typeof (sessionData as Record<string, unknown>).amount === "number")) {
+    console.error("[api-client] Raw response:", JSON.stringify(raw, null, 2));
+    throw new Error("Payload recebido não possui as propriedades de valor esperadas.");
+  }
+
+  // Normalise: if backend uses `amount` instead of `amountFiat`, map it
+  if (!sessionData.amountFiat && typeof (sessionData as Record<string, unknown>).amount === "number") {
+    sessionData.amountFiat = (sessionData as Record<string, unknown>).amount as number;
+  }
+
+  return sessionData;
 }
 
 // ── Initiate Checkout (POST) — Server decides price/currency ──
@@ -37,20 +53,27 @@ export async function initiateCheckout(data: {
   sessionId: string;
   customerDetails: CustomerDetails;
 }): Promise<InitiateCheckoutResponse["data"]> {
+  if (!data.sessionId) throw new Error("ID de sessão em falta.");
+
   const res = await fetch(v1("/checkout/initiate"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
 
-  const json: InitiateCheckoutResponse = await res.json();
+  const raw = await res.json();
 
-  if (!json.success) {
+  if (!res.ok) {
+    throw new Error(raw.message || raw.error || `Erro ${res.status} ao iniciar pagamento`);
+  }
+
+  const json: InitiateCheckoutResponse = raw.data ?? raw;
+
+  if (!json.success && !(json.gateway && json.checkoutData)) {
     throw new Error(
-      (json as unknown as { error: string }).error ||
-        "Erro ao iniciar pagamento"
+      raw.message || raw.error || "Erro ao iniciar pagamento"
     );
   }
 
-  return json.data;
+  return json.data ?? json;
 }

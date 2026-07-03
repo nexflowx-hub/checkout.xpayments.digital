@@ -229,16 +229,34 @@ function CheckoutPageInner() {
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
 
-  // Fetch session
+  // Fetch session — defensive: guard against undefined params, flexible payload
   useEffect(() => {
-    getSession(params.sessionId)
-      .then(setSession)
-      .catch((err) => {
-        console.error("[checkout] fetch error:", err);
-        setError(err.message || t("error.loadFailed"));
-      })
-      .finally(() => setLoading(false));
-  }, [params.sessionId, t]);
+    async function load() {
+      if (!params?.sessionId) {
+        console.warn("[checkout] sessionId is undefined — router not ready yet");
+        return;
+      }
+
+      try {
+        console.log("[checkout] 1. Fetching session with ID:", params.sessionId);
+        const data = await getSession(params.sessionId);
+        console.log("[checkout] 2. Session data extracted:", JSON.stringify(data, null, 2));
+
+        if (data && (data.amountFiat || typeof (data as Record<string, unknown>).amount === "number")) {
+          setSession(data);
+        } else {
+          throw new Error("Payload recebido não possui as propriedades de valor esperadas.");
+        }
+      } catch (err) {
+        console.error("[checkout] Fetch failed:", err);
+        setError(err instanceof Error ? err.message : t("error.loadFailed"));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  }, [params?.sessionId, t]);
 
   // Submit customer details — CRITICAL: only sessionId + customerDetails, NO price/currency
   const handleCustomerSubmit = useCallback(
