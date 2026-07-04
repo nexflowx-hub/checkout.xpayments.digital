@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -13,7 +13,9 @@ import {
   Loader2,
   CreditCard,
   QrCode,
+  X,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { OrderSummary, CompactOrderSummary } from "@/components/checkout/OrderSummary";
 import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
 import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
@@ -34,6 +36,14 @@ import {
   isStripeCheckoutData,
   isPixCheckoutData,
 } from "@/types/checkout";
+
+// ── PostMessage helpers (iframe ↔ parent window) ──
+
+function notifyParent(status: "SUCCESS" | "CLOSED" | "CANCELLED") {
+  if (typeof window !== "undefined" && window.parent !== window) {
+    window.parent.postMessage({ type: "XPAYMENTS_STATUS", status }, "*");
+  }
+}
 
 // ── Status from URL query ──
 
@@ -124,8 +134,14 @@ function SuccessScreen({
   const { t } = useI18n();
   const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
 
-  // Close window
+  // Notify parent iframe that payment succeeded
+  useEffect(() => {
+    notifyParent("SUCCESS");
+  }, []);
+
+  // Close window / notify parent
   const handleClose = useCallback(() => {
+    notifyParent("CLOSED");
     try { window.close(); } catch {}
   }, []);
 
@@ -216,8 +232,18 @@ function ErrorScreen({ message }: { message: string }) {
 
 function CheckoutPageInner() {
   const { t } = useI18n();
+  const { setTheme } = useTheme();
   const params = useParams<{ sessionId: string }>();
+  const searchParams = useSearchParams();
   const paymentStatus = usePaymentStatus();
+
+  // ── Feature 1: Force theme from URL param (?theme=light|dark) ──
+  useEffect(() => {
+    const forced = searchParams.get("theme");
+    if (forced === "light" || forced === "dark") {
+      setTheme(forced);
+    }
+  }, [searchParams, setTheme]);
 
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -480,9 +506,11 @@ function CheckoutPageInner() {
 
 export default function CheckoutPage() {
   return (
-    <I18nProvider>
-      <CheckoutPageInner />
-    </I18nProvider>
+    <Suspense fallback={<CheckoutSkeleton />}>
+      <I18nProvider>
+        <CheckoutPageInner />
+      </I18nProvider>
+    </Suspense>
   );
 }
 
@@ -501,16 +529,31 @@ function CheckoutHeader({
 }) {
   const { t } = useI18n();
 
+  const handleClose = useCallback(() => {
+    notifyParent("CLOSED");
+    try { window.close(); } catch {}
+  }, []);
+
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
+          {/* Close button — visible when inside iframe or as overlay */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClose}
+            className="h-8 w-8 p-0 mr-1 shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </Button>
           {showBack && onBack && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onBack}
-              className="h-8 w-8 p-0 mr-1 shrink-0 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
