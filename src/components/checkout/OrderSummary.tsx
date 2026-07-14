@@ -12,7 +12,7 @@ interface OrderSummaryProps {
 
 export function OrderSummary({ session, brandColor }: OrderSummaryProps) {
   const { t } = useI18n();
-  const { storeName, logoUrl, amountFiat, currency } = session;
+  const { storeName, logoUrl, amount, currency } = session;
 
   return (
     <div className="flex flex-col h-full">
@@ -78,7 +78,7 @@ export function OrderSummary({ session, brandColor }: OrderSummaryProps) {
         <div className="flex items-baseline justify-between mb-4">
           <span className="text-sm text-muted-foreground">{t("order.total")}</span>
           <span className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
-            {formatCurrency(amountFiat, currency)}
+            {formatCurrency(amount, currency)}
           </span>
         </div>
 
@@ -106,7 +106,7 @@ export function CompactOrderSummary({
   brandColor: string;
 }) {
   const { t } = useI18n();
-  const { storeName, logoUrl, amountFiat, currency } = session;
+  const { storeName, logoUrl, amount, currency } = session;
 
   return (
     <div className="flex items-center gap-3">
@@ -131,7 +131,7 @@ export function CompactOrderSummary({
         </p>
       </div>
       <p className="text-sm font-bold text-foreground whitespace-nowrap">
-        {formatCurrency(amountFiat, currency)}
+        {formatCurrency(amount, currency)}
       </p>
     </div>
   );

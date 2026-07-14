@@ -136,7 +136,7 @@ export function PixPaymentForm({
           style={{ backgroundColor: `${brandColor}18`, color: brandColor, borderColor: `${brandColor}30` }}
           variant="outline"
         >
-          {formatCurrency(session.amountFiat, session.currency)}
+          {formatCurrency(session.amount, session.currency)}
         </Badge>
       </div>
 

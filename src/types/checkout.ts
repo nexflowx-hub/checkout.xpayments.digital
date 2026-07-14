@@ -1,20 +1,25 @@
-// ── Checkout Session (Server-to-Server V2) ──
-
-export type SessionStatus = "OPEN" | "COMPLETED" | "EXPIRED";
+// ── Checkout Session (V3 — Payment Orchestration) ──
 
 export interface CheckoutSession {
   sessionId: string;
-  storeId?: string;
-  amountFiat: number;
-  currency: string;
   storeName: string;
+  amount: number;
+  currency: string;
+  reference?: string;
+  // Optional branding (may not be returned by V3)
   logoUrl?: string;
   primaryColor?: string;
-  status: SessionStatus;
+  storeId?: string;
 }
 
-// ── Customer Details ──
+// ── Customer (V3 — only name + email sent to backend) ──
 
+export interface CustomerPayload {
+  name: string;
+  email: string;
+}
+
+/** Full customer details collected in the form (UI only — not all sent to API) */
 export interface CustomerDetails {
   fullName: string;
   email: string;
@@ -25,7 +30,15 @@ export interface CustomerDetails {
   city?: string;
 }
 
-// ── Gateway Response ──
+// ── V3 Initiate Payment Request ──
+
+export interface InitiatePaymentRequest {
+  sessionId: string;
+  paymentMethod: string;
+  customer: CustomerPayload;
+}
+
+// ── Gateway Response (unchanged — backend still returns gateway-specific data) ──
 
 export type GatewayType = string;
 
@@ -86,6 +99,11 @@ export function getPixCode(data: PixCheckoutData): string {
 export function isQrCodeImage(qrCode: string | undefined): boolean {
   if (!qrCode) return false;
   return qrCode.startsWith("http") || qrCode.startsWith("data:");
+}
+
+/** Smart routing: BRL → PIX, else → STRIPE */
+export function resolvePaymentMethod(currency: string): string {
+  return currency.toUpperCase() === "BRL" ? "PIX" : "STRIPE";
 }
 
 export function formatCurrency(amount: number, currency: string): string {

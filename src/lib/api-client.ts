@@ -1,9 +1,9 @@
-// ── API Client for XPayments V2 Backend ──
-// Strict Server-to-Server Checkout Session architecture.
+// ── API Client for XPayments V3 Backend ──
+// Payment Orchestration architecture.
 
 import type {
   CheckoutSession,
-  CustomerDetails,
+  InitiatePaymentRequest,
   InitiateCheckoutResponse,
 } from "@/types/checkout";
 
@@ -13,24 +13,23 @@ const API_URL = process.env.NEXT_PUBLIC_MASTER_API || "https://api.xpayments.dig
 const v1 = (endpoint: string) => `${API_URL}/api/v1${endpoint}`;
 
 /**
- * Normalise a raw backend payload into a valid CheckoutSession.
- * The backend may omit `sessionId` and `status` — we supply safe defaults
- * so the UI never crashes on a partial response.
+ * Normalise a raw V3 payload into a CheckoutSession.
+ * V3 returns { sessionId, storeName, amount, currency, reference }.
+ * Branding fields (logoUrl, primaryColor) are optional extras.
  */
 function normalizeSession(
   raw: Record<string, unknown>,
   fallbackId: string
 ): CheckoutSession {
   const session: CheckoutSession = {
-    // Backend may return `amount` instead of `amountFiat`
-    amountFiat: (raw.amountFiat as number) ?? (raw.amount as number) ?? 0,
-    currency: (raw.currency as string) ?? "EUR",
-    storeName: (raw.storeName as string) ?? "Store",
     sessionId: (raw.sessionId as string) ?? fallbackId,
-    status: ((raw.status as string) ?? "OPEN") as CheckoutSession["status"],
+    storeName: (raw.storeName as string) ?? "Store",
+    amount: (raw.amount as number) ?? 0,
+    currency: (raw.currency as string) ?? "EUR",
   };
 
-  // Optional fields — only copy if present
+  // Optional fields — only copy if present and valid
+  if (raw.reference != null) session.reference = raw.reference as string;
   if (raw.storeId != null) session.storeId = raw.storeId as string;
   if (raw.logoUrl != null && raw.logoUrl !== "null") session.logoUrl = raw.logoUrl as string;
   if (raw.primaryColor != null) session.primaryColor = raw.primaryColor as string;
@@ -55,30 +54,30 @@ export async function getSession(
     throw new Error(raw.message || raw.error || `Erro ${res.status} na consulta da API`);
   }
 
-  // Backend may wrap under `data`, `session`, or return directly
-  const envelope = (raw.data ?? raw.session ?? raw) as Record<string, unknown>;
+  // Backend wraps under `data`
+  const envelope = (raw.data ?? raw) as Record<string, unknown>;
 
-  // Minimal validation: must contain an amount field
-  if (!envelope || !(envelope.amountFiat || typeof envelope.amount === "number")) {
+  // Minimal validation: must contain amount
+  if (!envelope || typeof envelope.amount !== "number") {
     console.error("[api-client] Raw response:", JSON.stringify(raw, null, 2));
     throw new Error("Payload recebido não possui as propriedades de valor esperadas.");
   }
 
-  console.log("[api-client] Normalising session:", JSON.stringify(envelope, null, 2));
+  console.log("[api-client] Normalising V3 session:", JSON.stringify(envelope, null, 2));
   return normalizeSession(envelope, sessionId);
 }
 
-// ── Initiate Checkout (POST) — Server decides price/currency ──
+// ── Initiate Payment (V3) — NO auth headers, sessionId-only validation ──
 
-export async function initiateCheckout(data: {
-  sessionId: string;
-  customerDetails: CustomerDetails;
-}): Promise<InitiateCheckoutResponse["data"]> {
+export async function initiatePayment(
+  data: InitiatePaymentRequest
+): Promise<InitiateCheckoutResponse["data"]> {
   if (!data.sessionId) throw new Error("ID de sessão em falta.");
 
   const res = await fetch(v1("/checkout/initiate"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    // NO Authorization header — V3 validates via sessionId only
     body: JSON.stringify(data),
   });
 

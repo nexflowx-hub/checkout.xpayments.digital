@@ -23,7 +23,7 @@ import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
 import { ThemeToggle } from "@/components/checkout/ThemeToggle";
 import { LanguageSelector } from "@/components/checkout/LanguageSelector";
 import { I18nProvider, useI18n } from "@/lib/i18n";
-import { getSession, initiateCheckout } from "@/lib/api-client";
+import { getSession, initiatePayment } from "@/lib/api-client";
 import type {
   CheckoutSession,
   CustomerDetails,
@@ -35,6 +35,7 @@ import {
   isPixGateway,
   isStripeCheckoutData,
   isPixCheckoutData,
+  resolvePaymentMethod,
 } from "@/types/checkout";
 
 // ── PostMessage helpers (iframe ↔ parent window) ──
@@ -280,7 +281,7 @@ function CheckoutPageInner() {
     load();
   }, [params?.sessionId, t]);
 
-  // Submit customer details — CRITICAL: only sessionId + customerDetails, NO price/currency
+  // Submit customer details — V3: sessionId + paymentMethod + customer { name, email }
   const handleCustomerSubmit = useCallback(
     async (customerDetails: CustomerDetails) => {
       if (!session) return;
@@ -288,9 +289,13 @@ function CheckoutPageInner() {
       setInitiateError(null);
 
       try {
-        const result = await initiateCheckout({
+        const result = await initiatePayment({
           sessionId: params.sessionId,
-          customerDetails,
+          paymentMethod: resolvePaymentMethod(session.currency),
+          customer: {
+            name: customerDetails.fullName,
+            email: customerDetails.email,
+          },
         });
         setCheckoutResult(result);
         setStep("payment");
@@ -322,11 +327,6 @@ function CheckoutPageInner() {
   if (error) return <ErrorScreen message={error} />;
   if (!session) return <ErrorScreen message={t("error.notFound")} />;
 
-  // Block access if session is explicitly not OPEN (tolerates missing status — normalised to OPEN)
-  if (session.status && session.status !== "OPEN" && paymentStatus !== "success") {
-    return <ErrorScreen message={t("error.notFound")} />;
-  }
-
   const brandColor = session.primaryColor || "#111111";
 
   // Success screen
@@ -356,7 +356,7 @@ function CheckoutPageInner() {
       : null;
 
   const returnUrl = `${window.location.origin}/pay/${params.sessionId}?status=success`;
-  const amountStr = formatCurrency(session.amountFiat, session.currency);
+  const amountStr = formatCurrency(session.amount, session.currency);
 
   // ── STEP 1: Lead Capture ──
   if (step === "customer_details") {
