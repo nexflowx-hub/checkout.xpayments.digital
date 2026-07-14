@@ -101,3 +101,22 @@ Stage Summary:
 - Smart routing: EUR→Card/MBWAY/Bizum/Multibanco, BRL→PIX/Card, USD→Card/USDT(coming soon)
 - V3 API contract: initiatePayment({ sessionId, paymentMethod, customer: { name, email, phone? } })
 - Payment icons copied to public/icons/
+
+---
+Task ID: 2
+Agent: main
+Task: Fix merchant-controlled theming, verify header logo, update README, push to GitHub
+
+Work Log:
+- Fixed layout.tsx: changed `enableSystem` from `true` to `false` — prevents OS dark mode from overriding merchant theme
+- Fixed page.tsx theme effect: now explicitly resets to "light" when no dark preference exists (prevents theme persistence between sessions)
+- Dark mode only activates on: (1) `session.metadata.theme === 'dark'` from API, or (2) `?theme=dark` URL param
+- Verified CheckoutHeader already correctly handles: `session.logoUrl` → `<img>`, fallback → colored initials + storeName text
+- Wrote comprehensive V3 technical README (~300 lines) covering: architecture, V3 API contract, smart routing, per-method behavior, theming rules, header branding, PostMessage API, i18n, TypeScript types, Stripe integration, deployment, security
+- ESLint clean, committed, pushed to GitHub (main)
+
+Stage Summary:
+- `enableSystem={false}` ensures theme is 100% merchant-controlled
+- Explicit `setTheme("light")` reset prevents dark theme leaking between sessions
+- Header logo: API-driven `logoUrl` with storeName text fallback (already working)
+- README fully rewritten for V3 Smart Drop-in architecture
