@@ -70,4 +70,34 @@ Stage Summary:
 - Two-step conversion-optimized flow: capture first, pay second
 - Stripe tabs with Web3 placeholder ready for future crypto integration
 - Expanded lead capture: 7 fields (3 required, 4 optional) with country auto-detect
-- All components defensively coded — no crashes on missing payload data
+- All components defensively coded — no crashes on missing payload data---
+Task ID: 1
+Agent: Main Agent
+Task: Smart Drop-in / Dynamic Checkout — Single-screen refactoring
+
+Work Log:
+- Read all existing source files (types, api-client, xpApi, page, components, i18n)
+- Removed conflicting [urlCode] route that caused Next.js "different slug names" error
+- Updated src/types/checkout.ts: Added PaymentMethodType, PaymentMethodOption, SessionMetadata, MultibancoCheckoutData, PhoneCheckoutData, updated CheckoutData union, added gateway type guards, added getPaymentMethodsForCurrency(), added phone to CustomerPayload
+- Updated src/app/layout.tsx: Changed defaultTheme from "system" to "light"
+- Updated src/lib/i18n.tsx: Added 60+ new translation keys for single-screen checkout (3 locales: pt, en, es), removed old step-based keys, made useI18n resilient with FALLBACK_CONTEXT
+- Updated src/lib/api-client.ts: Added SessionMetadata handling in normalizeSession
+- Copied 6 payment method SVG icons to public/icons/ (visa, mastercard, mbway, bizum, pix, apple-pay)
+- Created src/components/checkout/OrderBlock.tsx (Block A: amount, currency, reference)
+- Created src/components/checkout/CustomerBlock.tsx (Block B: compact name+email with useMemo validation)
+- Created src/components/checkout/PaymentWall.tsx (Block C: currency-filtered method grid with disabled/selected states)
+- Created src/components/checkout/methods/CardPayment.tsx (Stripe Payment Element, no tabs)
+- Created src/components/checkout/methods/PhonePayment.tsx (MBWAY/Bizum phone input + "waiting for approval" state)
+- Created src/components/checkout/methods/AsyncPayment.tsx (PIX QR code + Multibanco entity/reference)
+- Rewrote src/app/pay/[sessionId]/page.tsx as single-screen Dynamic Checkout
+- Fixed SSR crash: window not defined → typeof window guard
+- Fixed SSR crash: useI18n outside I18nProvider → FALLBACK_CONTEXT pattern
+- Fixed ESLint: set-state-in-effect → useMemo for validation
+- Verified: lint clean, 200 response, correct SSR skeleton, correct client hydration
+
+Stage Summary:
+- Complete single-screen Dynamic Checkout implemented (no multi-step flow)
+- White-label theming: merchant controls dark mode via session.metadata.theme, no user toggle
+- Smart routing: EUR→Card/MBWAY/Bizum/Multibanco, BRL→PIX/Card, USD→Card/USDT(coming soon)
+- V3 API contract: initiatePayment({ sessionId, paymentMethod, customer: { name, email, phone? } })
+- Payment icons copied to public/icons/

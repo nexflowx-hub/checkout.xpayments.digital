@@ -1,5 +1,10 @@
 // ── Checkout Session (V3 — Payment Orchestration) ──
 
+export interface SessionMetadata {
+  theme?: string;
+  [key: string]: unknown;
+}
+
 export interface CheckoutSession {
   sessionId: string;
   storeName: string;
@@ -10,24 +15,83 @@ export interface CheckoutSession {
   logoUrl?: string;
   primaryColor?: string;
   storeId?: string;
+  // Optional metadata (theme control, etc.)
+  metadata?: SessionMetadata;
 }
 
-// ── Customer (V3 — only name + email sent to backend) ──
+// ── Payment Method Types ──
+
+export type PaymentMethodType =
+  | "card"
+  | "mbway"
+  | "bizum"
+  | "multibanco"
+  | "pix"
+  | "usdt";
+
+export interface PaymentMethodOption {
+  id: PaymentMethodType;
+  labelKey: string;        // i18n key for label
+  icon: string;            // path to SVG in /icons/
+  currencies: string[];    // which currencies show this method
+  comingSoon?: boolean;    // placeholder (e.g. USDT)
+}
+
+/** All available payment methods */
+export const PAYMENT_METHODS: PaymentMethodOption[] = [
+  {
+    id: "card",
+    labelKey: "method.card",
+    icon: "/icons/visa.svg",
+    currencies: ["EUR", "BRL", "USD"],
+  },
+  {
+    id: "mbway",
+    labelKey: "method.mbway",
+    icon: "/icons/mbway.svg",
+    currencies: ["EUR"],
+  },
+  {
+    id: "bizum",
+    labelKey: "method.bizum",
+    icon: "/icons/bizum.svg",
+    currencies: ["EUR"],
+  },
+  {
+    id: "multibanco",
+    labelKey: "method.multibanco",
+    icon: "/icons/mastercard.svg",
+    currencies: ["EUR"],
+  },
+  {
+    id: "pix",
+    labelKey: "method.pix",
+    icon: "/icons/pix.svg",
+    currencies: ["BRL"],
+  },
+  {
+    id: "usdt",
+    labelKey: "method.usdt",
+    icon: "/icons/apple-pay.svg",
+    currencies: ["USD"],
+    comingSoon: true,
+  },
+];
+
+/** Filter payment methods by currency */
+export function getPaymentMethodsForCurrency(
+  currency: string
+): PaymentMethodOption[] {
+  const upper = currency.toUpperCase();
+  return PAYMENT_METHODS.filter((m) => m.currencies.includes(upper));
+}
+
+// ── Customer (V3 — name + email required; phone optional for MBWAY/Bizum) ──
 
 export interface CustomerPayload {
   name: string;
   email: string;
-}
-
-/** Full customer details collected in the form (UI only — not all sent to API) */
-export interface CustomerDetails {
-  fullName: string;
-  email: string;
   phone?: string;
-  country: string;
-  address?: string;
-  postalCode?: string;
-  city?: string;
 }
 
 // ── V3 Initiate Payment Request ──
@@ -38,7 +102,7 @@ export interface InitiatePaymentRequest {
   customer: CustomerPayload;
 }
 
-// ── Gateway Response (unchanged — backend still returns gateway-specific data) ──
+// ── Gateway Response Types ──
 
 export type GatewayType = string;
 
@@ -57,7 +121,23 @@ export interface PixCheckoutData {
   expiresAt?: string;
 }
 
-export type CheckoutData = StripeCheckoutData | PixCheckoutData;
+export interface MultibancoCheckoutData {
+  entity: string;
+  reference: string;
+  amount: number;
+  providerTxId: string;
+}
+
+export interface PhoneCheckoutData {
+  providerTxId: string;
+  status?: string;
+}
+
+export type CheckoutData =
+  | StripeCheckoutData
+  | PixCheckoutData
+  | MultibancoCheckoutData
+  | PhoneCheckoutData;
 
 export interface InitiateCheckoutResponse {
   success: boolean;
@@ -67,7 +147,7 @@ export interface InitiateCheckoutResponse {
   };
 }
 
-// ── Helpers ──
+// ── Type Guards ──
 
 export function isStripeGateway(gateway: GatewayType): boolean {
   return gateway.toUpperCase().includes("STRIPE");
@@ -76,6 +156,15 @@ export function isStripeGateway(gateway: GatewayType): boolean {
 export function isPixGateway(gateway: GatewayType): boolean {
   const upper = gateway.toUpperCase();
   return upper.includes("MISTIC") || upper.includes("PIX");
+}
+
+export function isMultibancoGateway(gateway: GatewayType): boolean {
+  return gateway.toUpperCase().includes("MULTIBANCO");
+}
+
+export function isPhoneGateway(gateway: GatewayType): boolean {
+  const upper = gateway.toUpperCase();
+  return upper.includes("MBWAY") || upper.includes("BIZUM");
 }
 
 export function isStripeCheckoutData(
@@ -87,7 +176,19 @@ export function isStripeCheckoutData(
 export function isPixCheckoutData(
   data: CheckoutData
 ): data is PixCheckoutData {
-  return !("clientSecret" in data);
+  return "pixString" in data || "pixCode" in data;
+}
+
+export function isMultibancoCheckoutData(
+  data: CheckoutData
+): data is MultibancoCheckoutData {
+  return "entity" in data && "reference" in data;
+}
+
+export function isPhoneCheckoutData(
+  data: CheckoutData
+): data is PhoneCheckoutData {
+  return !("clientSecret" in data) && !("pixString" in data) && !("pixCode" in data) && !("entity" in data);
 }
 
 /** Get the PIX string from either pixString or pixCode field */
@@ -99,11 +200,6 @@ export function getPixCode(data: PixCheckoutData): string {
 export function isQrCodeImage(qrCode: string | undefined): boolean {
   if (!qrCode) return false;
   return qrCode.startsWith("http") || qrCode.startsWith("data:");
-}
-
-/** Smart routing: BRL → PIX, else → STRIPE */
-export function resolvePaymentMethod(currency: string): string {
-  return currency.toUpperCase() === "BRL" ? "PIX" : "STRIPE";
 }
 
 export function formatCurrency(amount: number, currency: string): string {

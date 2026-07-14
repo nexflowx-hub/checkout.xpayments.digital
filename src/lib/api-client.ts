@@ -3,6 +3,7 @@
 
 import type {
   CheckoutSession,
+  SessionMetadata,
   InitiatePaymentRequest,
   InitiateCheckoutResponse,
 } from "@/types/checkout";
@@ -33,6 +34,11 @@ function normalizeSession(
   if (raw.storeId != null) session.storeId = raw.storeId as string;
   if (raw.logoUrl != null && raw.logoUrl !== "null") session.logoUrl = raw.logoUrl as string;
   if (raw.primaryColor != null) session.primaryColor = raw.primaryColor as string;
+
+  // Optional metadata (e.g. theme control)
+  if (raw.metadata != null && typeof raw.metadata === "object") {
+    session.metadata = raw.metadata as SessionMetadata;
+  }
 
   return session;
 }

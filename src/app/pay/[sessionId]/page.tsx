@@ -3,39 +3,38 @@
 import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft,
   ShieldCheck,
   CheckCircle2,
   XCircle,
   Loader2,
-  CreditCard,
-  QrCode,
   X,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { OrderSummary, CompactOrderSummary } from "@/components/checkout/OrderSummary";
-import { CustomerDetailsForm } from "@/components/checkout/CustomerDetailsForm";
-import { StripePaymentForm } from "@/components/checkout/StripePaymentForm";
-import { PixPaymentForm } from "@/components/checkout/PixPaymentForm";
-import { ThemeToggle } from "@/components/checkout/ThemeToggle";
+import { OrderBlock } from "@/components/checkout/OrderBlock";
+import { CustomerBlock } from "@/components/checkout/CustomerBlock";
+import { PaymentWall } from "@/components/checkout/PaymentWall";
+import { CardPayment } from "@/components/checkout/methods/CardPayment";
+import { PhonePayment } from "@/components/checkout/methods/PhonePayment";
+import { AsyncPayment } from "@/components/checkout/methods/AsyncPayment";
 import { LanguageSelector } from "@/components/checkout/LanguageSelector";
 import { I18nProvider, useI18n } from "@/lib/i18n";
 import { getSession, initiatePayment } from "@/lib/api-client";
 import type {
   CheckoutSession,
-  CustomerDetails,
+  PaymentMethodOption,
+  PaymentMethodType,
   CheckoutData,
+  StripeCheckoutData,
+  PixCheckoutData,
+  MultibancoCheckoutData,
 } from "@/types/checkout";
 import {
   formatCurrency,
-  isStripeGateway,
-  isPixGateway,
   isStripeCheckoutData,
   isPixCheckoutData,
-  resolvePaymentMethod,
+  isMultibancoCheckoutData,
 } from "@/types/checkout";
 
 // ── PostMessage helpers (iframe ↔ parent window) ──
@@ -65,60 +64,60 @@ interface CheckoutResult {
   checkoutData: CheckoutData;
 }
 
-// ── Minimal Header (no session data needed) ──
+// ── Methods that require phone input before initiating ──
 
-function MinimalHeader() {
-  return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-md bg-foreground flex items-center justify-center">
-            <span className="text-background font-bold text-[10px] sm:text-xs">XP</span>
-          </div>
-          <span className="font-semibold text-xs sm:text-sm text-foreground">
-            XPayments
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          <LanguageSelector />
-          <ThemeToggle />
-          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground shrink-0 ml-1">
-            <ShieldCheck className="h-3 w-3" />
-            <span className="hidden sm:inline">Secure</span>
-          </div>
-        </div>
-      </div>
-    </header>
-  );
-}
+const PHONE_METHODS: PaymentMethodType[] = ["mbway", "bizum"];
+
+// ── Methods that initiate immediately on click ──
+
+const INSTANT_METHODS: PaymentMethodType[] = ["card", "pix", "multibanco"];
 
 // ── Loading Skeleton ──
 
 function CheckoutSkeleton() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <MinimalHeader />
-      <div className="flex-1 max-w-5xl mx-auto w-full px-4 pb-8 grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <div className="lg:col-span-2">
-          <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
-            <Skeleton className="h-10 w-40" />
-            <Skeleton className="h-4 w-24" />
-            <div className="h-px bg-border" />
-            <Skeleton className="h-20 w-full rounded-lg" />
-            <Skeleton className="h-8 w-32" />
+      {/* Header skeleton */}
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
+        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <Skeleton className="h-5 w-16" />
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6 space-y-4">
+        {/* Block A skeleton */}
+        <div className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-10 w-40 mx-auto" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+
+        {/* Block B skeleton */}
+        <div className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
+          <Skeleton className="h-4 w-40" />
+          <div className="grid grid-cols-2 gap-3">
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full" />
           </div>
         </div>
-        <div className="lg:col-span-3">
-          <div className="rounded-xl border border-border/50 bg-card p-6 space-y-4">
-            <Skeleton className="h-5 w-48" />
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full mt-2" />
-            <Skeleton className="h-12 w-full mt-4" />
+
+        {/* Block C skeleton */}
+        <div className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
+          <Skeleton className="h-4 w-48" />
+          <div className="grid grid-cols-2 gap-2.5">
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
           </div>
         </div>
-      </div>
+      </main>
+
+      <CheckoutFooter />
     </div>
   );
 }
@@ -127,20 +126,14 @@ function CheckoutSkeleton() {
 
 const REDIRECT_SECONDS = 3;
 
-function SuccessScreen({
-  storeName,
-}: {
-  storeName: string;
-}) {
+function SuccessScreen({ storeName }: { storeName: string }) {
   const { t } = useI18n();
   const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
 
-  // Notify parent iframe that payment succeeded
   useEffect(() => {
     notifyParent("SUCCESS");
   }, []);
 
-  // Close window / notify parent
   const handleClose = useCallback(() => {
     notifyParent("CLOSED");
     try { window.close(); } catch {}
@@ -150,7 +143,6 @@ function SuccessScreen({
 
   return (
     <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center space-y-6">
-      {/* Animated checkmark */}
       <div
         className="relative flex items-center justify-center h-20 w-20 rounded-full animate-[success-pop_0.5s_ease-out]"
         style={{ backgroundColor: "#22c55e15" }}
@@ -158,7 +150,6 @@ function SuccessScreen({
         <CheckCircle2 className="h-10 w-10" style={{ color: "#22c55e" }} />
       </div>
 
-      {/* Title + store name */}
       <div className="space-y-2">
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
           {t("success.title")}
@@ -169,26 +160,19 @@ function SuccessScreen({
         </p>
       </div>
 
-      {/* Email confirmation note */}
       <p className="text-xs text-muted-foreground max-w-[300px]">
         {t("success.email")}
       </p>
 
-      {/* Progress bar */}
       <div className="w-full max-w-[320px] space-y-3 pt-1">
         <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-1000 ease-linear"
-            style={{
-              width: `${progressPct}%`,
-              backgroundColor: "#22c55e",
-            }}
+            style={{ width: `${progressPct}%`, backgroundColor: "#22c55e" }}
           />
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          {t("success.closeDesc")}
-        </p>
+        <p className="text-xs text-muted-foreground">{t("success.closeDesc")}</p>
 
         <Button
           type="button"
@@ -209,22 +193,14 @@ function ErrorScreen({ message }: { message: string }) {
   const { t } = useI18n();
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <MinimalHeader />
-      <div className="flex-1 flex items-center justify-center px-4">
-        <div className="text-center space-y-5 max-w-sm w-full">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-destructive/10">
-            <XCircle className="h-8 w-8 text-destructive" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-xl font-bold text-foreground">{t("error.title")}</h1>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {message}
-            </p>
-          </div>
-        </div>
+    <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center space-y-5 px-4">
+      <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-destructive/10">
+        <XCircle className="h-8 w-8 text-destructive" />
       </div>
-      <CheckoutFooter />
+      <div className="space-y-2 max-w-sm">
+        <h1 className="text-xl font-bold text-foreground">{t("error.title")}</h1>
+        <p className="text-sm text-muted-foreground leading-relaxed">{message}</p>
+      </div>
     </div>
   );
 }
@@ -238,25 +214,39 @@ function CheckoutPageInner() {
   const searchParams = useSearchParams();
   const paymentStatus = usePaymentStatus();
 
-  // ── Feature 1: Force theme from URL param (?theme=light|dark) ──
-  useEffect(() => {
-    const forced = searchParams.get("theme");
-    if (forced === "light" || forced === "dark") {
-      setTheme(forced);
-    }
-  }, [searchParams, setTheme]);
-
+  // ── Session state ──
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Step management
-  const [step, setStep] = useState<"customer_details" | "payment">("customer_details");
-  const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
+  // ── Customer state (Block B) ──
+  const [customerValid, setCustomerValid] = useState(false);
+  const [customerData, setCustomerData] = useState({ name: "", email: "" });
+
+  // ── Payment state (Block C) ──
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
+  const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
+  const [phoneSubmitted, setPhoneSubmitted] = useState(false);
 
-  // Fetch session — defensive: guard against undefined params
+  // ── Theme control: URL param > session.metadata > default "light" ──
+  useEffect(() => {
+    const forced = searchParams.get("theme");
+    if (forced === "light" || forced === "dark") {
+      setTheme(forced);
+      return; // URL param takes precedence
+    }
+    // Check session metadata for theme preference
+    if (session?.metadata?.theme) {
+      const theme = session.metadata.theme.toLowerCase();
+      if (theme === "dark" || theme === "light") {
+        setTheme(theme);
+      }
+    }
+  }, [searchParams, session?.metadata?.theme, setTheme]);
+
+  // ── Fetch session ──
   useEffect(() => {
     async function load() {
       const sid = params?.sessionId;
@@ -266,9 +256,9 @@ function CheckoutPageInner() {
       }
 
       try {
-        console.log("[checkout] 1. Fetching session:", sid);
+        console.log("[checkout] Fetching session:", sid);
         const data = await getSession(sid);
-        console.log("[checkout] 2. Normalised session:", JSON.stringify(data, null, 2));
+        console.log("[checkout] Normalised session:", JSON.stringify(data, null, 2));
         setSession(data);
       } catch (err) {
         console.error("[checkout] Fetch failed:", err);
@@ -281,55 +271,137 @@ function CheckoutPageInner() {
     load();
   }, [params?.sessionId, t]);
 
-  // Submit customer details — V3: sessionId + paymentMethod + customer { name, email }
-  const handleCustomerSubmit = useCallback(
-    async (customerDetails: CustomerDetails) => {
+  // ── Customer validity callback ──
+  const handleCustomerValidityChange = useCallback(
+    (isValid: boolean, data: { name: string; email: string }) => {
+      setCustomerValid(isValid);
+      setCustomerData(data);
+    },
+    []
+  );
+
+  // ── Initiate payment (for instant methods and phone methods) ──
+  const doInitiate = useCallback(
+    async (methodId: string, phone?: string) => {
       if (!session) return;
       setInitiating(true);
       setInitiateError(null);
 
       try {
-        const result = await initiatePayment({
+        const payload: {
+          sessionId: string;
+          paymentMethod: string;
+          customer: { name: string; email: string; phone?: string };
+        } = {
           sessionId: params.sessionId,
-          paymentMethod: resolvePaymentMethod(session.currency),
+          paymentMethod: methodId,
           customer: {
-            name: customerDetails.fullName,
-            email: customerDetails.email,
+            name: customerData.name,
+            email: customerData.email,
           },
-        });
+        };
+
+        // Add phone for MBWAY/Bizum
+        if (phone) {
+          payload.customer.phone = phone;
+        }
+
+        console.log("[checkout] Initiating payment:", JSON.stringify(payload, null, 2));
+        const result = await initiatePayment(payload);
+        console.log("[checkout] Initiate result:", JSON.stringify(result, null, 2));
         setCheckoutResult(result);
-        setStep("payment");
       } catch (err) {
-        console.error("[checkout] initiate error:", err);
+        console.error("[checkout] Initiate error:", err);
         setInitiateError(
-          err instanceof Error ? err.message : t("error.serverError")
+          err instanceof Error ? err.message : t("error.initiateFailed")
         );
+        // On error, allow re-selection
+        setSelectedMethod(null);
       } finally {
         setInitiating(false);
       }
     },
-    [session, params.sessionId, t]
+    [session, params.sessionId, customerData, t]
   );
 
-  const handleGoBack = useCallback(() => {
-    setStep("customer_details");
-    setCheckoutResult(null);
-    setInitiateError(null);
-  }, []);
+  // ── Handle payment method selection ──
+  const handleSelectMethod = useCallback(
+    (method: PaymentMethodOption) => {
+      if (!customerValid) return;
 
+      setSelectedMethod(method);
+      setCheckoutResult(null);
+      setInitiateError(null);
+      setPhoneSubmitted(false);
+
+      // Coming soon — just select visually, no action
+      if (method.comingSoon) return;
+
+      // Instant methods: initiate immediately
+      if (INSTANT_METHODS.includes(method.id)) {
+        doInitiate(method.id);
+      }
+      // Phone methods (MBWAY/Bizum): show phone input, wait for submission
+      // No action here — PhonePayment component handles the submit
+    },
+    [customerValid, doInitiate]
+  );
+
+  // ── Handle phone submission (for MBWAY/Bizum) ──
+  const handlePhoneSubmit = useCallback(
+    (phone: string) => {
+      if (!selectedMethod) return;
+      setPhoneSubmitted(true);
+      doInitiate(selectedMethod.id, phone);
+    },
+    [selectedMethod, doInitiate]
+  );
+
+  // ── PIX success callback ──
   const handlePixSuccess = useCallback(() => {
     window.location.href = `/pay/${params.sessionId}?status=success`;
   }, [params.sessionId]);
 
-  // ── Render states ──
+  // ── Derived state ──
+  const brandColor = session?.primaryColor || "#111111";
+  const isLocked = initiating || !!checkoutResult || phoneSubmitted;
+  const amountStr = session ? formatCurrency(session.amount, session.currency) : "";
 
+  // Type-narrowed checkout data
+  const stripeData =
+    checkoutResult && isStripeCheckoutData(checkoutResult.checkoutData)
+      ? checkoutResult.checkoutData
+      : null;
+  const pixData =
+    checkoutResult && isPixCheckoutData(checkoutResult.checkoutData)
+      ? checkoutResult.checkoutData
+      : null;
+  const multibancoData =
+    checkoutResult && isMultibancoCheckoutData(checkoutResult.checkoutData)
+      ? checkoutResult.checkoutData
+      : null;
+
+  const returnUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/pay/${params.sessionId}?status=success`
+    : `/pay/${params.sessionId}?status=success`;
+
+  // ── Render: Loading ──
   if (loading) return <CheckoutSkeleton />;
-  if (error) return <ErrorScreen message={error} />;
-  if (!session) return <ErrorScreen message={t("error.notFound")} />;
 
-  const brandColor = session.primaryColor || "#111111";
+  // ── Render: Error ──
+  if (error || !session) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <MinimalHeader />
+        <main className="flex-1">
+          <ErrorScreen message={error || t("error.notFound")} />
+        </main>
+        <CheckoutFooter />
+      </div>
+    );
+  }
 
-  // Success screen
+  // ── Render: Success ──
   if (paymentStatus === "success") {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -342,162 +414,109 @@ function CheckoutPageInner() {
     );
   }
 
-  // Gateway resolution
-  const gateway = checkoutResult?.gateway ?? "";
-  const isStripe = isStripeGateway(gateway);
-  const isPix = isPixGateway(gateway);
-  const stripeData =
-    checkoutResult && isStripeCheckoutData(checkoutResult.checkoutData)
-      ? checkoutResult.checkoutData
-      : null;
-  const pixData =
-    checkoutResult && isPixCheckoutData(checkoutResult.checkoutData)
-      ? checkoutResult.checkoutData
-      : null;
-
-  const returnUrl = `${window.location.origin}/pay/${params.sessionId}?status=success`;
-  const amountStr = formatCurrency(session.amount, session.currency);
-
-  // ── STEP 1: Lead Capture ──
-  if (step === "customer_details") {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <CheckoutHeader session={session} brandColor={brandColor} />
-
-        <main className="flex-1 px-3 sm:px-4 py-4 sm:py-8">
-          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6 items-start">
-            {/* Left: Order Summary (desktop) */}
-            <div className="hidden lg:block lg:col-span-2">
-              <div className="rounded-xl border border-border/50 bg-card sticky top-20">
-                <OrderSummary session={session} brandColor={brandColor} />
-              </div>
-            </div>
-
-            {/* Right: Form */}
-            <div className="lg:col-span-3 w-full">
-              <div className="rounded-xl border border-border/50 bg-card p-5 sm:p-6 lg:p-8">
-                {/* Mobile order summary */}
-                <div className="lg:hidden mb-6 p-4 rounded-lg bg-muted/30 border border-border/30">
-                  <CompactOrderSummary
-                    session={session}
-                    brandColor={brandColor}
-                  />
-                </div>
-
-                <div className="space-y-1 mb-6">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">
-                    {t("step1.title")}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {t("step1.subtitle")}
-                  </p>
-                </div>
-
-                {initiateError && (
-                  <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 mb-5">
-                    <p className="text-sm text-destructive">{initiateError}</p>
-                  </div>
-                )}
-
-                <CustomerDetailsForm
-                  onSubmit={handleCustomerSubmit}
-                  brandColor={brandColor}
-                />
-              </div>
-
-              <CheckoutFooter />
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // ── STEP 2: Payment ──
+  // ── Render: Main Single-Screen Checkout ──
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <CheckoutHeader
-        session={session}
-        brandColor={brandColor}
-        onBack={handleGoBack}
-        showBack
-      />
+      <CheckoutHeader session={session} brandColor={brandColor} />
 
-      <main className="flex-1 px-3 sm:px-4 py-4 sm:py-8">
-        <div className="max-w-2xl mx-auto w-full">
-          <div className="rounded-xl border border-border/50 bg-card overflow-hidden">
-            {/* Compact order bar */}
-            <div className="px-5 sm:px-6 py-4 border-b border-border/50 bg-muted/20">
-              <CompactOrderSummary
-                session={session}
-                brandColor={brandColor}
-              />
+      <main className="flex-1 px-4 py-5 sm:py-8">
+        <div className="max-w-lg mx-auto w-full space-y-4">
+          {/* ── Block A: Order Summary ── */}
+          <OrderBlock session={session} brandColor={brandColor} />
+
+          {/* ── Block B: Customer Identification ── */}
+          <CustomerBlock
+            brandColor={brandColor}
+            onValidityChange={handleCustomerValidityChange}
+          />
+
+          {/* ── Block C: Payment Wall ── */}
+          <PaymentWall
+            currency={session.currency}
+            enabled={customerValid}
+            selectedMethod={selectedMethod?.id ?? null}
+            locked={isLocked}
+            onSelectMethod={handleSelectMethod}
+            brandColor={brandColor}
+          />
+
+          {/* ── Initiate Error ── */}
+          {initiateError && (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
+              <p className="text-sm text-destructive">{initiateError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 h-8 text-xs"
+                onClick={() => {
+                  setInitiateError(null);
+                  setSelectedMethod(null);
+                  setCheckoutResult(null);
+                  setPhoneSubmitted(false);
+                }}
+              >
+                {t("error.serverError").includes("Tente") ? "Tentar novamente" : "Try again"}
+              </Button>
             </div>
+          )}
 
-            <div className="p-5 sm:p-6 lg:p-8">
-              {/* Gateway icon + label */}
-              <div className="flex items-center gap-2.5 mb-5">
-                {isPix ? (
-                  <div
-                    className="flex items-center justify-center h-8 w-8 rounded-lg"
-                    style={{ backgroundColor: `${brandColor}15` }}
-                  >
-                    <QrCode className="h-4 w-4" style={{ color: brandColor }} />
-                  </div>
-                ) : (
-                  <div
-                    className="flex items-center justify-center h-8 w-8 rounded-lg"
-                    style={{ backgroundColor: `${brandColor}15` }}
-                  >
-                    <CreditCard className="h-4 w-4" style={{ color: brandColor }} />
-                  </div>
-                )}
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {isPix ? t("step2.pix.title") : t("step2.stripe.title")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isPix
-                      ? t("step2.pix.subtitle")
-                      : t("step2.stripe.subtitle")}
-                  </p>
-                </div>
-              </div>
-
-              <Separator className="mb-5" />
-
-              {/* Payment content */}
-              {initiating ? (
-                <div className="flex flex-col items-center justify-center py-14 space-y-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    {t("step2.preparing")}
-                  </p>
-                </div>
-              ) : isStripe && stripeData ? (
-                <StripePaymentForm
-                  clientSecret={stripeData.clientSecret}
-                  publicKey={stripeData.publicKey}
-                  returnUrl={returnUrl}
-                  brandColor={brandColor}
-                  amount={amountStr}
-                />
-              ) : isPix && pixData ? (
-                <PixPaymentForm
-                  checkoutData={pixData}
-                  brandColor={brandColor}
-                  session={session}
-                  onSuccess={handlePixSuccess}
-                />
-              ) : (
-                <ErrorScreen message={t("step2.unsupported")} />
-              )}
+          {/* ── Initiating Spinner ── */}
+          {initiating && (
+            <div className="rounded-xl border border-border/50 bg-card p-8 flex flex-col items-center justify-center space-y-3">
+              <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                {t("block.payment.title")}...
+              </p>
             </div>
-          </div>
+          )}
 
-          <CheckoutFooter />
+          {/* ── Method-Specific Expanders ── */}
+          {/* Card: Stripe Payment Element */}
+          {selectedMethod?.id === "card" && stripeData && !initiating && (
+            <CardPayment
+              clientSecret={stripeData.clientSecret}
+              publicKey={stripeData.publicKey}
+              returnUrl={returnUrl}
+              brandColor={brandColor}
+              amount={amountStr}
+            />
+          )}
+
+          {/* MBWAY / Bizum: Phone input or waiting state */}
+          {selectedMethod && PHONE_METHODS.includes(selectedMethod.id) && !initiating && (
+            <PhonePayment
+              method={selectedMethod.id}
+              brandColor={brandColor}
+              onSubmit={handlePhoneSubmit}
+              isSubmitting={false}
+              isWaiting={phoneSubmitted}
+            />
+          )}
+
+          {/* PIX: QR Code + Copy/Paste */}
+          {selectedMethod?.id === "pix" && pixData && !initiating && (
+            <AsyncPayment
+              data={pixData}
+              session={session}
+              brandColor={brandColor}
+              variant="pix"
+            />
+          )}
+
+          {/* Multibanco: Entity + Reference */}
+          {selectedMethod?.id === "multibanco" && multibancoData && !initiating && (
+            <AsyncPayment
+              data={multibancoData}
+              session={session}
+              brandColor={brandColor}
+              variant="multibanco"
+            />
+          )}
         </div>
       </main>
+
+      <CheckoutFooter />
     </div>
   );
 }
@@ -516,16 +535,34 @@ export default function CheckoutPage() {
 
 // ── Sub-components ──
 
+function MinimalHeader() {
+  return (
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
+      <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="h-7 w-7 rounded-md bg-foreground flex items-center justify-center">
+            <span className="text-background font-bold text-xs">XP</span>
+          </div>
+          <span className="font-semibold text-sm text-foreground">XPayments</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <LanguageSelector />
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 ml-1">
+            <ShieldCheck className="h-3 w-3" />
+            <span className="hidden sm:inline">Secure</span>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function CheckoutHeader({
   session,
   brandColor,
-  onBack,
-  showBack,
 }: {
   session: CheckoutSession;
   brandColor: string;
-  onBack?: () => void;
-  showBack?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -536,9 +573,9 @@ function CheckoutHeader({
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 h-12 sm:h-14 flex items-center justify-between">
+      <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
-          {/* Close button — visible when inside iframe or as overlay */}
+          {/* Close button */}
           <Button
             variant="ghost"
             size="sm"
@@ -548,31 +585,23 @@ function CheckoutHeader({
           >
             <X className="h-4 w-4" />
           </Button>
-          {showBack && onBack && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          )}
+
+          {/* Logo or store name */}
           {session.logoUrl ? (
             <img
               src={session.logoUrl}
               alt={session.storeName}
-              className="h-6 w-auto sm:h-7 max-w-[120px] sm:max-w-[140px] object-contain"
+              className="h-7 w-auto max-w-[140px] object-contain"
             />
           ) : (
             <div className="flex items-center gap-2 min-w-0">
               <div
-                className="h-6 w-6 sm:h-7 sm:w-7 rounded-md flex items-center justify-center text-white font-bold text-[10px] sm:text-xs shrink-0"
+                className="h-7 w-7 rounded-md flex items-center justify-center text-white font-bold text-xs shrink-0"
                 style={{ backgroundColor: brandColor }}
               >
                 {session.storeName.slice(0, 2).toUpperCase()}
               </div>
-              <span className="font-semibold text-xs sm:text-sm text-foreground truncate">
+              <span className="font-semibold text-sm text-foreground truncate">
                 {session.storeName}
               </span>
             </div>
@@ -580,18 +609,10 @@ function CheckoutHeader({
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Language selector */}
           <LanguageSelector />
-
-          {/* Theme toggle */}
-          <ThemeToggle />
-
-          {/* Secure badge */}
-          <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground shrink-0 ml-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 ml-1">
             <ShieldCheck className="h-3 w-3" />
-            <span className="hidden sm:inline">
-              {t("header.secure")}
-            </span>
+            <span className="hidden sm:inline">{t("header.secure")}</span>
           </div>
         </div>
       </div>
@@ -603,7 +624,7 @@ function CheckoutFooter() {
   const { t } = useI18n();
 
   return (
-    <div className="flex items-center justify-center gap-1.5 pt-6 pb-2 text-[11px] text-muted-foreground/60">
+    <div className="mt-auto flex items-center justify-center gap-1.5 pt-6 pb-3 text-[11px] text-muted-foreground/60">
       <span>{t("footer.poweredBy")}</span>
       <span className="font-semibold text-muted-foreground">
         {t("footer.xpayments")}

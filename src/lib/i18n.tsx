@@ -27,17 +27,76 @@ const translations: Record<Locale, Record<string, string>> = {
     // Header
     "header.secure": "Checkout Seguro",
 
-    // Step 1
-    "step1.title": "Informações de Contacto",
-    "step1.subtitle": "Insira os seus dados para prosseguir.",
+    // Order Block (Block A)
+    "block.order.title": "Resumo do Pedido",
+    "block.order.reference": "Referência",
+    "block.order.amount": "Total a Pagar",
 
-    // Step 2
-    "step2.pix.title": "Pagamento PIX",
-    "step2.pix.subtitle": "Escaneie o QR Code ou copie o código.",
-    "step2.stripe.title": "Pagamento",
-    "step2.stripe.subtitle": "Cartão, MBWay, Multibanco e outros métodos.",
-    "step2.preparing": "A preparar o pagamento...",
-    "step2.unsupported": "Gateway de pagamento não suportado.",
+    // Customer Block (Block B)
+    "block.customer.title": "Identificação do Pagador",
+    "block.customer.subtitle": "Nome e email para confirmação.",
+    "block.customer.name": "Nome Completo",
+    "block.customer.namePlaceholder": "João Silva",
+    "block.customer.nameRequired": "Nome é obrigatório",
+    "block.customer.nameMin": "Mínimo 2 caracteres",
+    "block.customer.email": "Email",
+    "block.customer.emailPlaceholder": "joao@email.com",
+    "block.customer.emailRequired": "Email é obrigatório",
+    "block.customer.emailInvalid": "Email inválido",
+
+    // Payment Wall (Block C)
+    "block.payment.title": "Selecione o Método de Pagamento",
+    "block.payment.disabledHint": "Preencha os dados acima para ativar os métodos",
+
+    // Payment Methods
+    "method.card": "Cartão",
+    "method.mbway": "MB WAY",
+    "method.bizum": "Bizum",
+    "method.multibanco": "Multibanco",
+    "method.pix": "PIX",
+    "method.usdt": "USDT",
+    "method.comingSoon": "Em breve",
+
+    // Card Payment
+    "card.payNow": "Pagar agora",
+    "card.processing": "A processar pagamento...",
+    "card.encrypted": "Pagamento encriptado via Stripe",
+    "card.keyMissing": "Stripe Payment Element",
+    "card.keyMissingDesc": "A chave pública do Stripe não foi recebida do servidor.",
+    "card.crashTitle": "Aguardando configuração do Gateway",
+    "card.crashDesc": "O Stripe não conseguiu inicializar o pagamento.\nTente novamente mais tarde.",
+
+    // Phone Payment (MBWAY / Bizum)
+    "phone.title": "Número de Telemóvel",
+    "phone.placeholder": "+351 912 345 678",
+    "phone.required": "Número de telemóvel é obrigatório",
+    "phone.invalid": "Número de telemóvel inválido",
+    "phone.submit": "Confirmar Pagamento",
+    "phone.submitting": "A submeter...",
+    "phone.waitingTitle": "A aguardar aprovação",
+    "phone.waitingDesc": "Abra a app e confirme o pagamento.",
+    "phone.waitingHint": "Não feche esta janela. Será redirecionado automaticamente.",
+
+    // PIX
+    "pix.scanTitle": "Escaneie o QR Code",
+    "pix.scanSubtitle": "Abra o app do seu banco e escaneie",
+    "pix.expired": "Expirado",
+    "pix.copyTitle": "Código PIX Copia e Cola",
+    "pix.copy": "Copiar",
+    "pix.copied": "Copiado",
+    "pix.generateNew": "Gerar novo QR Code",
+    "pix.autoRefresh": "Após o pagamento, a página será atualizada automaticamente.",
+    "pix.qrExpired": "QR Expirado",
+
+    // Multibanco
+    "multibanco.title": "Dados para Pagamento Multibanco",
+    "multibanco.entity": "Entidade",
+    "multibanco.reference": "Referência",
+    "multibanco.amount": "Montante",
+    "multibanco.hint": "Pague na sua banca próxima ou via homebanking.",
+    "multibanco.copyEntity": "Copiar Entidade",
+    "multibanco.copyRef": "Copiar Referência",
+    "multibanco.copied": "Copiado",
 
     // Success
     "success.title": "Pagamento Confirmado!",
@@ -51,87 +110,86 @@ const translations: Record<Locale, Record<string, string>> = {
     "error.notFound": "Link não encontrado",
     "error.loadFailed": "Não foi possível carregar o link de pagamento.",
     "error.serverError": "Erro de ligação ao servidor. Tente novamente.",
-
-    // Form
-    "form.fullName": "Nome Completo",
-    "form.fullNamePlaceholder": "João Silva",
-    "form.fullNameRequired": "Nome completo é obrigatório",
-    "form.fullNameMin": "Mínimo 2 caracteres",
-    "form.email": "Email",
-    "form.emailPlaceholder": "joao@email.com",
-    "form.emailRequired": "Email é obrigatório",
-    "form.emailInvalid": "Email inválido",
-    "form.phone": "Telefone",
-    "form.phonePlaceholder": "+351 912 345 678",
-    "form.country": "País",
-    "form.countryRequired": "Selecione o país",
-    "form.address": "Morada",
-    "form.addressPlaceholder": "Rua, Número, Andar",
-    "form.postalCode": "Código Postal",
-    "form.postalCodePlaceholder": "1000-001",
-    "form.city": "Cidade",
-    "form.cityPlaceholder": "Lisboa",
-    "form.submit": "Continuar para Pagamento",
-    "form.processing": "A processar...",
-    "form.terms": "Ao continuar, concorda com os",
-    "form.termsService": "Termos de Serviço",
-    "form.termsAnd": "e",
-    "form.privacyPolicy": "Política de Privacidade",
-
-    // Stripe
-    "stripe.cardTab": "Cartão / Pagamento",
-    "stripe.web3Tab": "Web3 / Crypto",
-    "stripe.payNow": "Pagar agora",
-    "stripe.processing": "A processar pagamento...",
-    "stripe.encrypted": "Pagamento encriptado via Stripe",
-    "stripe.web3Title": "Pagamento Web3",
-    "stripe.web3Subtitle": "Em breve poderá pagar com criptomoedas.\nConecte a sua Wallet Metamask.",
-    "stripe.web3ComingSoon": "Em breve",
-    "stripe.keyMissing": "Stripe Payment Element",
-    "stripe.keyMissingDesc": "A chave pública do Stripe não foi recebida do servidor.",
-    "stripe.crashTitle": "Aguardando configuração do Gateway pelo Lojista",
-    "stripe.crashDesc": "O Stripe não conseguiu inicializar o pagamento.\nTente novamente mais tarde.",
-
-    // PIX
-    "pix.scanTitle": "Escaneie o QR Code",
-    "pix.scanSubtitle": "Abra o app do seu banco e escaneie",
-    "pix.expired": "Expirado",
-    "pix.copyTitle": "Código PIX Copia e Cola",
-    "pix.copy": "Copiar",
-    "pix.copied": "Copiado",
-    "pix.generateNew": "Gerar novo QR Code",
-    "pix.autoRefresh": "Após o pagamento, a página será atualizada automaticamente.",
-    "pix.qrExpired": "QR Expirado",
-
-    // Order
-    "order.secureCheckout": "Checkout seguro",
-    "order.payment": "Pagamento",
-    "order.unit": "1x Unidade",
-    "order.total": "Total",
-    "order.securePayment": "Pagamento seguro",
+    "error.initiateFailed": "Não foi possível iniciar o pagamento.",
 
     // Footer
     "footer.poweredBy": "Powered by",
     "footer.xpayments": "XPayments",
-
-    // Back
-    "action.back": "Voltar",
   },
   en: {
     // Header
     "header.secure": "Secure Checkout",
 
-    // Step 1
-    "step1.title": "Contact Information",
-    "step1.subtitle": "Enter your details to proceed.",
+    // Order Block (Block A)
+    "block.order.title": "Order Summary",
+    "block.order.reference": "Reference",
+    "block.order.amount": "Total to Pay",
 
-    // Step 2
-    "step2.pix.title": "PIX Payment",
-    "step2.pix.subtitle": "Scan the QR Code or copy the code.",
-    "step2.stripe.title": "Payment",
-    "step2.stripe.subtitle": "Card, MBWay, Multibanco and other methods.",
-    "step2.preparing": "Preparing payment...",
-    "step2.unsupported": "Payment gateway not supported.",
+    // Customer Block (Block B)
+    "block.customer.title": "Payer Identification",
+    "block.customer.subtitle": "Name and email for confirmation.",
+    "block.customer.name": "Full Name",
+    "block.customer.namePlaceholder": "John Smith",
+    "block.customer.nameRequired": "Name is required",
+    "block.customer.nameMin": "Minimum 2 characters",
+    "block.customer.email": "Email",
+    "block.customer.emailPlaceholder": "john@email.com",
+    "block.customer.emailRequired": "Email is required",
+    "block.customer.emailInvalid": "Invalid email",
+
+    // Payment Wall (Block C)
+    "block.payment.title": "Select Payment Method",
+    "block.payment.disabledHint": "Fill in the details above to activate payment methods",
+
+    // Payment Methods
+    "method.card": "Card",
+    "method.mbway": "MB WAY",
+    "method.bizum": "Bizum",
+    "method.multibanco": "Multibanco",
+    "method.pix": "PIX",
+    "method.usdt": "USDT",
+    "method.comingSoon": "Coming soon",
+
+    // Card Payment
+    "card.payNow": "Pay now",
+    "card.processing": "Processing payment...",
+    "card.encrypted": "Encrypted payment via Stripe",
+    "card.keyMissing": "Stripe Payment Element",
+    "card.keyMissingDesc": "The Stripe public key was not received from the server.",
+    "card.crashTitle": "Waiting for gateway configuration",
+    "card.crashDesc": "Stripe could not initialize the payment.\nPlease try again later.",
+
+    // Phone Payment (MBWAY / Bizum)
+    "phone.title": "Phone Number",
+    "phone.placeholder": "+351 912 345 678",
+    "phone.required": "Phone number is required",
+    "phone.invalid": "Invalid phone number",
+    "phone.submit": "Confirm Payment",
+    "phone.submitting": "Submitting...",
+    "phone.waitingTitle": "Waiting for approval",
+    "phone.waitingDesc": "Open the app and confirm the payment.",
+    "phone.waitingHint": "Do not close this window. You will be redirected automatically.",
+
+    // PIX
+    "pix.scanTitle": "Scan the QR Code",
+    "pix.scanSubtitle": "Open your bank app and scan",
+    "pix.expired": "Expired",
+    "pix.copyTitle": "PIX Copy and Paste Code",
+    "pix.copy": "Copy",
+    "pix.copied": "Copied",
+    "pix.generateNew": "Generate new QR Code",
+    "pix.autoRefresh": "After payment, the page will refresh automatically.",
+    "pix.qrExpired": "QR Expired",
+
+    // Multibanco
+    "multibanco.title": "Multibanco Payment Details",
+    "multibanco.entity": "Entity",
+    "multibanco.reference": "Reference",
+    "multibanco.amount": "Amount",
+    "multibanco.hint": "Pay at your nearest ATM or via homebanking.",
+    "multibanco.copyEntity": "Copy Entity",
+    "multibanco.copyRef": "Copy Reference",
+    "multibanco.copied": "Copied",
 
     // Success
     "success.title": "Payment Confirmed!",
@@ -145,87 +203,86 @@ const translations: Record<Locale, Record<string, string>> = {
     "error.notFound": "Link not found",
     "error.loadFailed": "Could not load the payment link.",
     "error.serverError": "Server connection error. Please try again.",
-
-    // Form
-    "form.fullName": "Full Name",
-    "form.fullNamePlaceholder": "John Smith",
-    "form.fullNameRequired": "Full name is required",
-    "form.fullNameMin": "Minimum 2 characters",
-    "form.email": "Email",
-    "form.emailPlaceholder": "john@email.com",
-    "form.emailRequired": "Email is required",
-    "form.emailInvalid": "Invalid email",
-    "form.phone": "Phone",
-    "form.phonePlaceholder": "+1 555 123 4567",
-    "form.country": "Country",
-    "form.countryRequired": "Select a country",
-    "form.address": "Address",
-    "form.addressPlaceholder": "Street, Number, Floor",
-    "form.postalCode": "Postal Code",
-    "form.postalCodePlaceholder": "10001",
-    "form.city": "City",
-    "form.cityPlaceholder": "New York",
-    "form.submit": "Continue to Payment",
-    "form.processing": "Processing...",
-    "form.terms": "By continuing, you agree to the",
-    "form.termsService": "Terms of Service",
-    "form.termsAnd": "and",
-    "form.privacyPolicy": "Privacy Policy",
-
-    // Stripe
-    "stripe.cardTab": "Card / Payment",
-    "stripe.web3Tab": "Web3 / Crypto",
-    "stripe.payNow": "Pay now",
-    "stripe.processing": "Processing payment...",
-    "stripe.encrypted": "Encrypted payment via Stripe",
-    "stripe.web3Title": "Web3 Payment",
-    "stripe.web3Subtitle": "Crypto payments coming soon.\nConnect your Metamask Wallet.",
-    "stripe.web3ComingSoon": "Coming soon",
-    "stripe.keyMissing": "Stripe Payment Element",
-    "stripe.keyMissingDesc": "The Stripe public key was not received from the server.",
-    "stripe.crashTitle": "Waiting for gateway configuration by the merchant",
-    "stripe.crashDesc": "Stripe could not initialize the payment.\nPlease try again later.",
-
-    // PIX
-    "pix.scanTitle": "Scan the QR Code",
-    "pix.scanSubtitle": "Open your bank app and scan",
-    "pix.expired": "Expired",
-    "pix.copyTitle": "PIX Copy and Paste Code",
-    "pix.copy": "Copy",
-    "pix.copied": "Copied",
-    "pix.generateNew": "Generate new QR Code",
-    "pix.autoRefresh": "After payment, the page will refresh automatically.",
-    "pix.qrExpired": "QR Expired",
-
-    // Order
-    "order.secureCheckout": "Secure checkout",
-    "order.payment": "Payment",
-    "order.unit": "1x Unit",
-    "order.total": "Total",
-    "order.securePayment": "Secure payment",
+    "error.initiateFailed": "Could not initiate the payment.",
 
     // Footer
     "footer.poweredBy": "Powered by",
     "footer.xpayments": "XPayments",
-
-    // Back
-    "action.back": "Back",
   },
   es: {
     // Header
     "header.secure": "Checkout Seguro",
 
-    // Step 1
-    "step1.title": "Información de Contacto",
-    "step1.subtitle": "Introduce tus datos para continuar.",
+    // Order Block (Block A)
+    "block.order.title": "Resumen del Pedido",
+    "block.order.reference": "Referencia",
+    "block.order.amount": "Total a Pagar",
 
-    // Step 2
-    "step2.pix.title": "Pago PIX",
-    "step2.pix.subtitle": "Escanea el código QR o copia el código.",
-    "step2.stripe.title": "Pago",
-    "step2.stripe.subtitle": "Tarjeta, Bizum y otros métodos.",
-    "step2.preparing": "Preparando el pago...",
-    "step2.unsupported": "Gateway de pago no soportado.",
+    // Customer Block (Block B)
+    "block.customer.title": "Identificación del Pagador",
+    "block.customer.subtitle": "Nombre y email para confirmación.",
+    "block.customer.name": "Nombre Completo",
+    "block.customer.namePlaceholder": "Juan García",
+    "block.customer.nameRequired": "El nombre es obligatorio",
+    "block.customer.nameMin": "Mínimo 2 caracteres",
+    "block.customer.email": "Email",
+    "block.customer.emailPlaceholder": "juan@email.com",
+    "block.customer.emailRequired": "El email es obligatorio",
+    "block.customer.emailInvalid": "Email inválido",
+
+    // Payment Wall (Block C)
+    "block.payment.title": "Selecciona el Método de Pago",
+    "block.payment.disabledHint": "Rellena los datos arriba para activar los métodos",
+
+    // Payment Methods
+    "method.card": "Tarjeta",
+    "method.mbway": "MB WAY",
+    "method.bizum": "Bizum",
+    "method.multibanco": "Multibanco",
+    "method.pix": "PIX",
+    "method.usdt": "USDT",
+    "method.comingSoon": "Próximamente",
+
+    // Card Payment
+    "card.payNow": "Pagar ahora",
+    "card.processing": "Procesando pago...",
+    "card.encrypted": "Pago encriptado vía Stripe",
+    "card.keyMissing": "Stripe Payment Element",
+    "card.keyMissingDesc": "La clave pública de Stripe no fue recibida del servidor.",
+    "card.crashTitle": "Esperando configuración del Gateway",
+    "card.crashDesc": "Stripe no pudo inicializar el pago.\nInténtalo de nuevo más tarde.",
+
+    // Phone Payment (MBWAY / Bizum)
+    "phone.title": "Número de Teléfono",
+    "phone.placeholder": "+34 612 345 678",
+    "phone.required": "El número de teléfono es obligatorio",
+    "phone.invalid": "Número de teléfono inválido",
+    "phone.submit": "Confirmar Pago",
+    "phone.submitting": "Enviando...",
+    "phone.waitingTitle": "Esperando aprobación",
+    "phone.waitingDesc": "Abre la app y confirma el pago.",
+    "phone.waitingHint": "No cierres esta ventana. Serás redirigido automáticamente.",
+
+    // PIX
+    "pix.scanTitle": "Escanea el Código QR",
+    "pix.scanSubtitle": "Abre la app de tu banco y escanea",
+    "pix.expired": "Expirado",
+    "pix.copyTitle": "Código PIX Copiar y Pegar",
+    "pix.copy": "Copiar",
+    "pix.copied": "Copiado",
+    "pix.generateNew": "Generar nuevo código QR",
+    "pix.autoRefresh": "Después del pago, la página se actualizará automáticamente.",
+    "pix.qrExpired": "QR Expirado",
+
+    // Multibanco
+    "multibanco.title": "Datos para Pago Multibanco",
+    "multibanco.entity": "Entidad",
+    "multibanco.reference": "Referencia",
+    "multibanco.amount": "Importe",
+    "multibanco.hint": "Paga en tu banco más cercano o vía homebanking.",
+    "multibanco.copyEntity": "Copiar Entidad",
+    "multibanco.copyRef": "Copiar Referencia",
+    "multibanco.copied": "Copiado",
 
     // Success
     "success.title": "¡Pago Confirmado!",
@@ -239,71 +296,11 @@ const translations: Record<Locale, Record<string, string>> = {
     "error.notFound": "Enlace no encontrado",
     "error.loadFailed": "No se pudo cargar el enlace de pago.",
     "error.serverError": "Error de conexión al servidor. Inténtalo de nuevo.",
-
-    // Form
-    "form.fullName": "Nombre Completo",
-    "form.fullNamePlaceholder": "Juan García",
-    "form.fullNameRequired": "El nombre es obligatorio",
-    "form.fullNameMin": "Mínimo 2 caracteres",
-    "form.email": "Email",
-    "form.emailPlaceholder": "juan@email.com",
-    "form.emailRequired": "El email es obligatorio",
-    "form.emailInvalid": "Email inválido",
-    "form.phone": "Teléfono",
-    "form.phonePlaceholder": "+34 612 345 678",
-    "form.country": "País",
-    "form.countryRequired": "Selecciona un país",
-    "form.address": "Dirección",
-    "form.addressPlaceholder": "Calle, Número, Piso",
-    "form.postalCode": "Código Postal",
-    "form.postalCodePlaceholder": "28001",
-    "form.city": "Ciudad",
-    "form.cityPlaceholder": "Madrid",
-    "form.submit": "Continuar al Pago",
-    "form.processing": "Procesando...",
-    "form.terms": "Al continuar, aceptas los",
-    "form.termsService": "Términos de Servicio",
-    "form.termsAnd": "y",
-    "form.privacyPolicy": "Política de Privacidad",
-
-    // Stripe
-    "stripe.cardTab": "Tarjeta / Pago",
-    "stripe.web3Tab": "Web3 / Crypto",
-    "stripe.payNow": "Pagar ahora",
-    "stripe.processing": "Procesando pago...",
-    "stripe.encrypted": "Pago encriptado vía Stripe",
-    "stripe.web3Title": "Pago Web3",
-    "stripe.web3Subtitle": "Próximamente podrás pagar con criptomonedas.\nConecta tu Wallet Metamask.",
-    "stripe.web3ComingSoon": "Próximamente",
-    "stripe.keyMissing": "Stripe Payment Element",
-    "stripe.keyMissingDesc": "La clave pública de Stripe no fue recibida del servidor.",
-    "stripe.crashTitle": "Esperando configuración del Gateway por el Comerciante",
-    "stripe.crashDesc": "Stripe no pudo inicializar el pago.\nInténtalo de nuevo más tarde.",
-
-    // PIX
-    "pix.scanTitle": "Escanea el Código QR",
-    "pix.scanSubtitle": "Abre la app de tu banco y escanea",
-    "pix.expired": "Expirado",
-    "pix.copyTitle": "Código PIX Copiar y Pegar",
-    "pix.copy": "Copiar",
-    "pix.copied": "Copiado",
-    "pix.generateNew": "Generar nuevo código QR",
-    "pix.autoRefresh": "Después del pago, la página se actualizará automáticamente.",
-    "pix.qrExpired": "QR Expirado",
-
-    // Order
-    "order.secureCheckout": "Checkout seguro",
-    "order.payment": "Pago",
-    "order.unit": "1x Unidad",
-    "order.total": "Total",
-    "order.securePayment": "Pago seguro",
+    "error.initiateFailed": "No se pudo iniciar el pago.",
 
     // Footer
     "footer.poweredBy": "Powered by",
     "footer.xpayments": "XPayments",
-
-    // Back
-    "action.back": "Volver",
   },
 };
 
@@ -388,46 +385,21 @@ function detectLocale(): Locale {
 export function detectCountryCode(): string {
   try {
     const lang = typeof navigator !== "undefined" ? (navigator.language || "pt-PT") : "pt-PT";
-    // 1. Try region from full locale (e.g. "pt-BR" → "BR")
     const parts = lang.split("-");
     if (parts.length > 1) {
       const region = parts[1].toUpperCase();
       if (region.length === 2) return region;
     }
-    // 2. Fallback: infer country from language code
     const code = parts[0].toLowerCase();
     const map: Record<string, string> = {
-      pt: "PT",
-      en: "US",
-      es: "ES",
-      fr: "FR",
-      de: "DE",
-      it: "IT",
-      nl: "NL",
-      be: "BE",
-      ch: "CH",
-      gb: "GB",
-      uk: "GB",
-      ie: "IE",
-      lu: "LU",
-      ao: "AO",
-      mz: "MZ",
-      cv: "CV",
+      pt: "PT", en: "US", es: "ES", fr: "FR", de: "DE",
+      it: "IT", nl: "NL", be: "BE", ch: "CH", gb: "GB",
+      uk: "GB", ie: "IE", lu: "LU", ao: "AO", mz: "MZ", cv: "CV",
     };
     return map[code] || "PT";
   } catch {
     return "PT";
   }
-}
-
-/** Suggested country based on current locale (used as initial hint). */
-export function suggestCountryForLocale(locale: Locale): string {
-  const map: Record<Locale, string> = {
-    pt: "PT",
-    en: "US",
-    es: "ES",
-  };
-  return map[locale] || "PT";
 }
 
 // ── Context ──
@@ -446,7 +418,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("pt");
   const [mounted, setMounted] = useState(false);
 
-  // Detect on mount + load from localStorage
   useEffect(() => {
     const stored = localStorage.getItem("xpayments-locale") as Locale | null;
     const detected = stored || detectLocale();
@@ -477,7 +448,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     [locale, setLocale, t]
   );
 
-  // Prevent hydration mismatch — render default locale until mounted
   if (!mounted) {
     return (
       <I18nContext.Provider value={{ locale: "pt", setLocale, t: (k) => translations.pt[k] ?? k }}>
@@ -491,8 +461,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
 // ── Hook ──
 
+const FALLBACK_CONTEXT: I18nContextValue = {
+  locale: "pt",
+  setLocale: () => {},
+  t: (key: string) => translations.pt?.[key] ?? key,
+};
+
 export function useI18n(): I18nContextValue {
   const ctx = useContext(I18nContext);
-  if (!ctx) throw new Error("useI18n must be used within <I18nProvider>");
-  return ctx;
+  return ctx ?? FALLBACK_CONTEXT;
 }
