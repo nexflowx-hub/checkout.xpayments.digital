@@ -230,20 +230,25 @@ function CheckoutPageInner() {
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
   const [phoneSubmitted, setPhoneSubmitted] = useState(false);
 
-  // ── Theme control: URL param > session.metadata > default "light" ──
+  // ── Theme control: URL param > session.metadata.theme === 'dark' > default "light" ──
+  // Dark mode is ONLY activated when the API returns theme: 'dark' or ?theme=dark is set.
+  // No user toggle. No system preference. Merchant-controlled.
   useEffect(() => {
     const forced = searchParams.get("theme");
-    if (forced === "light" || forced === "dark") {
-      setTheme(forced);
+    if (forced === "dark") {
+      setTheme("dark");
       return; // URL param takes precedence
     }
     // Check session metadata for theme preference
     if (session?.metadata?.theme) {
       const theme = session.metadata.theme.toLowerCase();
-      if (theme === "dark" || theme === "light") {
-        setTheme(theme);
+      if (theme === "dark") {
+        setTheme("dark");
+        return;
       }
     }
+    // No dark preference — always reset to light (merchant default)
+    setTheme("light");
   }, [searchParams, session?.metadata?.theme, setTheme]);
 
   // ── Fetch session ──
