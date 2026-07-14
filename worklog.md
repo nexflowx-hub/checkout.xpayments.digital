@@ -120,3 +120,25 @@ Stage Summary:
 - Explicit `setTheme("light")` reset prevents dark theme leaking between sessions
 - Header logo: API-driven `logoUrl` with storeName text fallback (already working)
 - README fully rewritten for V3 Smart Drop-in architecture
+
+---
+Task ID: 3
+Agent: main
+Task: V3 Smart Drop-in implementation — providerAction parsing, phone validation, success redirect
+
+Work Log:
+- Updated types/checkout.ts: Added NormalisedInitiateResult, updated InitiateCheckoutResponse with providerAction wrapper, added returnUrl to CheckoutSession, added validatePhoneForMethod() with PHONE_COUNTRY_PREFIXES config
+- Updated api-client.ts: initiatePayment() now extracts from data.providerAction.checkoutData (V3) with backwards-compat for direct data.checkoutData. Returns NormalisedInitiateResult { gateway, checkoutData }. normalizeSession() handles returnUrl from top-level or metadata.
+- Updated PhonePayment.tsx: Uses validatePhoneForMethod() for country-specific phone validation (PT/+351 for MBWAY, ES/+34 for Bizum). Method-specific placeholder text.
+- Updated AsyncPayment.tsx: MultibancoDisplay now has 'Fechar Checkout' button that sends XPAYMENTS_STATUS: CLOSED via PostMessage and resets page state via onClose prop.
+- Rewrote page.tsx: SuccessScreen with 3-second countdown + auto-redirect to merchant returnUrl (sourced from session.returnUrl > metadata.returnUrl > ?return_url param). Uses NormalisedInitiateResult instead of CheckoutResult. Added initiate.processing i18n key for spinner.
+- Updated i18n.tsx: Added 6 new keys across 3 locales (phone.countryMismatch, multibanco.close, initiate.processing, error.tryAgain, success.redirecting, success.returnToMerchant)
+- Updated xpApi.ts: Re-exports NormalisedInitiateResult type
+- ESLint clean, committed, pushed to GitHub (main)
+
+Stage Summary:
+- V3 providerAction parsing: frontend correctly extracts gateway + checkoutData from data.providerAction.checkoutData
+- Phone validation: MBWAY requires PT (+351), BIZUM requires ES (+34) with graceful fallback for local-format numbers
+- Multibanco: close button sends PostMessage CLOSED and resets checkout state
+- Success screen: 3-second countdown → auto-redirect to merchant URL (or close window)
+- All states (SUCCESS, CLOSED, CANCELLED) properly communicated via PostMessage API
