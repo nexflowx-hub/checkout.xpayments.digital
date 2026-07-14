@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Clock, QrCode, Smartphone, RefreshCw, Shield, Landmark } from "lucide-react";
+import { Copy, Check, Clock, QrCode, Smartphone, RefreshCw, Shield, Landmark, X } from "lucide-react";
 import type {
   CheckoutSession,
   PixCheckoutData,
@@ -11,6 +11,14 @@ import type {
 } from "@/types/checkout";
 import { formatCurrency, getPixCode, isQrCodeImage } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
+
+// ── PostMessage helper ──
+
+function notifyParent(status: "SUCCESS" | "CLOSED" | "CANCELLED") {
+  if (typeof window !== "undefined" && window.parent !== window) {
+    window.parent.postMessage({ type: "XPAYMENTS_STATUS", status }, "*");
+  }
+}
 
 // ── PIX Payment Display ──
 
@@ -217,9 +225,11 @@ function PixDisplay({
 function MultibancoDisplay({
   data,
   brandColor,
+  onClose,
 }: {
   data: MultibancoCheckoutData;
   brandColor: string;
+  onClose: () => void;
 }) {
   const { t } = useI18n();
 
@@ -234,6 +244,12 @@ function MultibancoDisplay({
       // fallback
     }
   }, []);
+
+  const handleClose = useCallback(() => {
+    notifyParent("CLOSED");
+    try { window.close(); } catch {}
+    onClose();
+  }, [onClose]);
 
   return (
     <div className="space-y-5">
@@ -317,6 +333,17 @@ function MultibancoDisplay({
       <p className="text-xs text-muted-foreground text-center">
         {t("multibanco.hint")}
       </p>
+
+      {/* Close button — terminates checkout */}
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full h-10 text-sm font-medium gap-2"
+        onClick={handleClose}
+      >
+        <X className="h-4 w-4" />
+        {t("multibanco.close")}
+      </Button>
     </div>
   );
 }
@@ -328,6 +355,7 @@ interface AsyncPaymentProps {
   session: CheckoutSession;
   brandColor: string;
   variant: "pix" | "multibanco";
+  onClose?: () => void;
 }
 
 export function AsyncPayment({
@@ -335,6 +363,7 @@ export function AsyncPayment({
   session,
   brandColor,
   variant,
+  onClose,
 }: AsyncPaymentProps) {
   return (
     <div className="rounded-xl border border-foreground/10 bg-muted/20 p-4 sm:p-5">
@@ -348,6 +377,7 @@ export function AsyncPayment({
         <MultibancoDisplay
           data={data as MultibancoCheckoutData}
           brandColor={brandColor}
+          onClose={onClose ?? (() => {})}
         />
       )}
     </div>

@@ -32,4 +32,4 @@ export async function loginRequest(
 // ── V3 Initiate Payment (re-exports api-client for unified access) ──
 
 export { getSession, initiatePayment } from "@/lib/api-client";
-export type { InitiatePaymentRequest } from "@/types/checkout";
+export type { InitiatePaymentRequest, NormalisedInitiateResult } from "@/types/checkout";

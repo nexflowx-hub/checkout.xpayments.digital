@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Phone, Loader2, Smartphone, CheckCircle2 } from "lucide-react";
 import type { PaymentMethodType } from "@/types/checkout";
+import { validatePhoneForMethod } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
 
 interface PhonePaymentProps {
@@ -15,6 +16,12 @@ interface PhonePaymentProps {
   isSubmitting: boolean;
   isWaiting: boolean;
 }
+
+/** Method-specific phone placeholders */
+const METHOD_PLACEHOLDERS: Record<string, string> = {
+  mbway: "+351 912 345 678",
+  bizum: "+34 612 345 678",
+};
 
 export function PhonePayment({
   method,
@@ -29,14 +36,9 @@ export function PhonePayment({
   const [error, setError] = useState<string | null>(null);
 
   function validate(): boolean {
-    if (!phone.trim()) {
-      setError(t("phone.required"));
-      return false;
-    }
-    // Basic phone validation: at least 7 digits, may start with +
-    const cleaned = phone.replace(/[\s\-()]/g, "");
-    if (!/^\+?\d{7,15}$/.test(cleaned)) {
-      setError(t("phone.invalid"));
+    const errorKey = validatePhoneForMethod(phone, method);
+    if (errorKey) {
+      setError(t(errorKey));
       return false;
     }
     setError(null);
@@ -48,6 +50,8 @@ export function PhonePayment({
     if (!validate()) return;
     onSubmit(phone.trim());
   }
+
+  const placeholder = METHOD_PLACEHOLDERS[method] ?? t("phone.placeholder");
 
   // Waiting for approval state
   if (isWaiting) {
@@ -124,7 +128,7 @@ export function PhonePayment({
             <Input
               id={`phone-${method}`}
               type="tel"
-              placeholder={t("phone.placeholder")}
+              placeholder={placeholder}
               value={phone}
               onChange={(e) => {
                 setPhone(e.target.value);

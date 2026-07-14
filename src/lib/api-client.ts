@@ -5,7 +5,8 @@ import type {
   CheckoutSession,
   SessionMetadata,
   InitiatePaymentRequest,
-  InitiateCheckoutResponse,
+  CheckoutData,
+  NormalisedInitiateResult,
 } from "@/types/checkout";
 
 const API_URL = process.env.NEXT_PUBLIC_MASTER_API || "https://api.xpayments.digital";
@@ -34,10 +35,17 @@ function normalizeSession(
   if (raw.storeId != null) session.storeId = raw.storeId as string;
   if (raw.logoUrl != null && raw.logoUrl !== "null") session.logoUrl = raw.logoUrl as string;
   if (raw.primaryColor != null) session.primaryColor = raw.primaryColor as string;
+  if (raw.returnUrl != null && raw.returnUrl !== "null") session.returnUrl = raw.returnUrl as string;
 
-  // Optional metadata (e.g. theme control)
+  // Optional metadata (theme control, returnUrl override, etc.)
   if (raw.metadata != null && typeof raw.metadata === "object") {
-    session.metadata = raw.metadata as SessionMetadata;
+    const meta = raw.metadata as Record<string, unknown>;
+    session.metadata = meta as SessionMetadata;
+
+    // Pull returnUrl from metadata if not at top level
+    if (!session.returnUrl && meta.returnUrl && meta.returnUrl !== "null") {
+      session.returnUrl = meta.returnUrl as string;
+    }
   }
 
   return session;
@@ -75,9 +83,24 @@ export async function getSession(
 
 // ── Initiate Payment (V3) — NO auth headers, sessionId-only validation ──
 
+/**
+ * V3 initiate response structure:
+ * {
+ *   success: true,
+ *   data: {
+ *     gateway: "STRIPE",
+ *     providerAction: {
+ *       checkoutData: { clientSecret, publicKey, ... }
+ *     }
+ *   }
+ * }
+ *
+ * We normalise into { gateway, checkoutData } for the UI layer.
+ * Also backwards-compatible with direct checkoutData under data.
+ */
 export async function initiatePayment(
   data: InitiatePaymentRequest
-): Promise<InitiateCheckoutResponse["data"]> {
+): Promise<NormalisedInitiateResult> {
   if (!data.sessionId) throw new Error("ID de sessão em falta.");
 
   const res = await fetch(v1("/checkout/initiate"), {
@@ -93,13 +116,20 @@ export async function initiatePayment(
     throw new Error(raw.message || raw.error || `Erro ${res.status} ao iniciar pagamento`);
   }
 
-  const json: InitiateCheckoutResponse = raw.data ?? raw;
+  console.log("[api-client] Initiate raw response:", JSON.stringify(raw, null, 2));
 
-  if (!json.success && !(json.gateway && json.checkoutData)) {
+  // Extract the inner data envelope
+  const envelope = raw.data ?? raw;
+  const gateway = envelope.gateway as string | undefined;
+  const checkoutData = (envelope.providerAction?.checkoutData ?? envelope.checkoutData) as CheckoutData | undefined;
+
+  if (!gateway || !checkoutData) {
+    console.error("[api-client] Cannot extract gateway/checkoutData from:", JSON.stringify(raw, null, 2));
     throw new Error(
-      raw.message || raw.error || "Erro ao iniciar pagamento"
+      raw.message || raw.error || "Erro ao iniciar pagamento — resposta inválida do gateway."
     );
   }
 
-  return json.data ?? json;
+  console.log("[api-client] Normalised result:", { gateway, checkoutData });
+  return { gateway, checkoutData };
 }

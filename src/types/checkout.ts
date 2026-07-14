@@ -2,6 +2,7 @@
 
 export interface SessionMetadata {
   theme?: string;
+  returnUrl?: string;
   [key: string]: unknown;
 }
 
@@ -15,8 +16,10 @@ export interface CheckoutSession {
   logoUrl?: string;
   primaryColor?: string;
   storeId?: string;
-  // Optional metadata (theme control, etc.)
+  // Optional metadata (theme control, returnUrl, etc.)
   metadata?: SessionMetadata;
+  // Merchant return URL for post-payment redirect
+  returnUrl?: string;
 }
 
 // ── Payment Method Types ──
@@ -139,12 +142,82 @@ export type CheckoutData =
   | MultibancoCheckoutData
   | PhoneCheckoutData;
 
+/**
+ * V3 Initiate Response — the Master Backend returns:
+ * {
+ *   success: true,
+ *   data: {
+ *     gateway: "STRIPE",
+ *     providerAction: {
+ *       checkoutData: { clientSecret, publicKey, ... }
+ *     }
+ *   }
+ * }
+ *
+ * We normalise this into { gateway, checkoutData } for the UI layer.
+ */
 export interface InitiateCheckoutResponse {
   success: boolean;
   data: {
     gateway: GatewayType;
-    checkoutData: CheckoutData;
+    providerAction?: {
+      checkoutData?: CheckoutData;
+      [key: string]: unknown;
+    };
+    // Backwards-compatible: checkoutData directly under data
+    checkoutData?: CheckoutData;
+    [key: string]: unknown;
   };
+}
+
+/** Normalised result returned to the page — always { gateway, checkoutData } */
+export interface NormalisedInitiateResult {
+  gateway: string;
+  checkoutData: CheckoutData;
+}
+
+// ── Phone Validation ──
+
+/** Country prefix mapping for phone-based methods */
+export const PHONE_COUNTRY_PREFIXES: Record<string, { country: string; prefix: string; digits: number }> = {
+  mbway: { country: "PT", prefix: "+351", digits: 9 },
+  bizum: { country: "ES", prefix: "+34", digits: 9 },
+};
+
+/**
+ * Validate phone number for a specific payment method.
+ * MBWAY requires PT (+351), BIZUM requires ES (+34).
+ * Returns an error key (for i18n) or null if valid.
+ */
+export function validatePhoneForMethod(
+  phone: string,
+  method: PaymentMethodType
+): string | null {
+  const cleaned = phone.replace(/[\s\-()]/g, "").trim();
+  if (!cleaned) return "phone.required";
+  if (!/^\+?\d{7,15}$/.test(cleaned)) return "phone.invalid";
+
+  const rule = PHONE_COUNTRY_PREFIXES[method];
+  if (!rule) return null; // No country restriction for unknown methods
+
+  // Check if the phone starts with the required prefix
+  const hasPrefix = cleaned.startsWith(rule.prefix);
+  // Also accept numbers without prefix that match the expected digit count
+  // (e.g., "912345678" for PT without +351)
+  const digitsOnly = cleaned.replace(/^\+/, "");
+  const digitCount = digitsOnly.replace(/^351|^34/, "").length;
+
+  if (!hasPrefix && digitCount !== rule.digits) {
+    return "phone.countryMismatch";
+  }
+  if (hasPrefix) {
+    const afterPrefix = cleaned.slice(rule.prefix.length);
+    if (afterPrefix.length !== rule.digits) {
+      return "phone.countryMismatch";
+    }
+  }
+
+  return null; // Valid
 }
 
 // ── Type Guards ──

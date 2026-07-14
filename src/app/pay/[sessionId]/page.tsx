@@ -26,6 +26,7 @@ import type {
   PaymentMethodOption,
   PaymentMethodType,
   CheckoutData,
+  NormalisedInitiateResult,
   StripeCheckoutData,
   PixCheckoutData,
   MultibancoCheckoutData,
@@ -55,13 +56,6 @@ function usePaymentStatus() {
     if (statusParam === "cancelled") return "cancelled";
     return null;
   }, [statusParam]);
-}
-
-// ── Checkout result ──
-
-interface CheckoutResult {
-  gateway: string;
-  checkoutData: CheckoutData;
 }
 
 // ── Methods that require phone input before initiating ──
@@ -126,7 +120,7 @@ function CheckoutSkeleton() {
 
 const REDIRECT_SECONDS = 3;
 
-function SuccessScreen({ storeName }: { storeName: string }) {
+function SuccessScreen({ storeName, returnUrl }: { storeName: string; returnUrl?: string }) {
   const { t } = useI18n();
   const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
 
@@ -134,10 +128,34 @@ function SuccessScreen({ storeName }: { storeName: string }) {
     notifyParent("SUCCESS");
   }, []);
 
+  // Countdown + auto-redirect
+  useEffect(() => {
+    if (countdown <= 0) {
+      // Redirect to merchant return URL, or close the window
+      if (returnUrl) {
+        window.location.href = returnUrl;
+      } else {
+        notifyParent("CLOSED");
+        try { window.close(); } catch {}
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown, returnUrl]);
+
   const handleClose = useCallback(() => {
     notifyParent("CLOSED");
-    try { window.close(); } catch {}
-  }, []);
+    if (returnUrl) {
+      window.location.href = returnUrl;
+    } else {
+      try { window.close(); } catch {}
+    }
+  }, [returnUrl]);
 
   const progressPct = ((REDIRECT_SECONDS - countdown) / REDIRECT_SECONDS) * 100;
 
@@ -165,6 +183,7 @@ function SuccessScreen({ storeName }: { storeName: string }) {
       </p>
 
       <div className="w-full max-w-[320px] space-y-3 pt-1">
+        {/* Progress bar */}
         <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-1000 ease-linear"
@@ -172,7 +191,14 @@ function SuccessScreen({ storeName }: { storeName: string }) {
           />
         </div>
 
-        <p className="text-xs text-muted-foreground">{t("success.closeDesc")}</p>
+        {/* Redirecting countdown or close message */}
+        {returnUrl && countdown > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {t("success.redirecting").replace("{s}", String(countdown))}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">{t("success.closeDesc")}</p>
+        )}
 
         <Button
           type="button"
@@ -180,7 +206,7 @@ function SuccessScreen({ storeName }: { storeName: string }) {
           className="w-full h-10 text-xs font-medium"
           onClick={handleClose}
         >
-          {t("success.closeWindow")}
+          {returnUrl ? t("success.returnToMerchant") : t("success.closeWindow")}
         </Button>
       </div>
     </div>
@@ -227,7 +253,7 @@ function CheckoutPageInner() {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
-  const [checkoutResult, setCheckoutResult] = useState<CheckoutResult | null>(null);
+  const [initiateResult, setInitiateResult] = useState<NormalisedInitiateResult | null>(null);
   const [phoneSubmitted, setPhoneSubmitted] = useState(false);
 
   // ── Theme control: URL param > session.metadata.theme === 'dark' > default "light" ──
@@ -285,7 +311,7 @@ function CheckoutPageInner() {
     []
   );
 
-  // ── Initiate payment (for instant methods and phone methods) ──
+  // ── Initiate payment (V3 contract: { sessionId, paymentMethod, customer }) ──
   const doInitiate = useCallback(
     async (methodId: string, phone?: string) => {
       if (!session) return;
@@ -293,28 +319,22 @@ function CheckoutPageInner() {
       setInitiateError(null);
 
       try {
-        const payload: {
-          sessionId: string;
-          paymentMethod: string;
-          customer: { name: string; email: string; phone?: string };
-        } = {
+        const payload = {
           sessionId: params.sessionId,
           paymentMethod: methodId,
           customer: {
             name: customerData.name,
             email: customerData.email,
+            ...(phone ? { phone } : {}),
           },
         };
 
-        // Add phone for MBWAY/Bizum
-        if (phone) {
-          payload.customer.phone = phone;
-        }
-
-        console.log("[checkout] Initiating payment:", JSON.stringify(payload, null, 2));
+        console.log("[checkout] Initiating payment (V3):", JSON.stringify(payload, null, 2));
         const result = await initiatePayment(payload);
         console.log("[checkout] Initiate result:", JSON.stringify(result, null, 2));
-        setCheckoutResult(result);
+
+        // Map gateway → component rendering is done by the parent
+        setInitiateResult(result);
       } catch (err) {
         console.error("[checkout] Initiate error:", err);
         setInitiateError(
@@ -335,18 +355,18 @@ function CheckoutPageInner() {
       if (!customerValid) return;
 
       setSelectedMethod(method);
-      setCheckoutResult(null);
+      setInitiateResult(null);
       setInitiateError(null);
       setPhoneSubmitted(false);
 
       // Coming soon — just select visually, no action
       if (method.comingSoon) return;
 
-      // Instant methods: initiate immediately
+      // Instant methods: initiate immediately (card, pix, multibanco)
       if (INSTANT_METHODS.includes(method.id)) {
         doInitiate(method.id);
       }
-      // Phone methods (MBWAY/Bizum): show phone input, wait for submission
+      // Phone methods (MBWAY/Bizum): show phone input, wait for user submission
       // No action here — PhonePayment component handles the submit
     },
     [customerValid, doInitiate]
@@ -362,30 +382,36 @@ function CheckoutPageInner() {
     [selectedMethod, doInitiate]
   );
 
-  // ── PIX success callback ──
-  const handlePixSuccess = useCallback(() => {
-    window.location.href = `/pay/${params.sessionId}?status=success`;
-  }, [params.sessionId]);
+  // ── Handle Multibanco close ──
+  const handleCloseMultibanco = useCallback(() => {
+    setSelectedMethod(null);
+    setInitiateResult(null);
+    setPhoneSubmitted(false);
+  }, []);
 
   // ── Derived state ──
   const brandColor = session?.primaryColor || "#111111";
-  const isLocked = initiating || !!checkoutResult || phoneSubmitted;
+  const isLocked = initiating || !!initiateResult || phoneSubmitted;
   const amountStr = session ? formatCurrency(session.amount, session.currency) : "";
 
-  // Type-narrowed checkout data
+  // Extract checkoutData from the normalised initiate result
+  const checkoutData: CheckoutData | null = initiateResult?.checkoutData ?? null;
+
+  // Type-narrowed data for each gateway
   const stripeData =
-    checkoutResult && isStripeCheckoutData(checkoutResult.checkoutData)
-      ? checkoutResult.checkoutData
+    checkoutData && isStripeCheckoutData(checkoutData)
+      ? checkoutData
       : null;
   const pixData =
-    checkoutResult && isPixCheckoutData(checkoutResult.checkoutData)
-      ? checkoutResult.checkoutData
+    checkoutData && isPixCheckoutData(checkoutData)
+      ? checkoutData
       : null;
   const multibancoData =
-    checkoutResult && isMultibancoCheckoutData(checkoutResult.checkoutData)
-      ? checkoutResult.checkoutData
+    checkoutData && isMultibancoCheckoutData(checkoutData)
+      ? checkoutData
       : null;
 
+  // Stripe return URL
   const returnUrl = typeof window !== "undefined"
     ? `${window.location.origin}/pay/${params.sessionId}?status=success`
     : `/pay/${params.sessionId}?status=success`;
@@ -408,11 +434,21 @@ function CheckoutPageInner() {
 
   // ── Render: Success ──
   if (paymentStatus === "success") {
+    // Redirect URL: session.returnUrl || metadata.returnUrl || query param
+    const merchantReturnUrl =
+      session.returnUrl ||
+      session.metadata?.returnUrl ||
+      searchParams.get("return_url") ||
+      undefined;
+
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <CheckoutHeader session={session} brandColor={brandColor} />
         <main className="flex-1 flex items-center justify-center px-4">
-          <SuccessScreen storeName={session.storeName} />
+          <SuccessScreen
+            storeName={session.storeName}
+            returnUrl={merchantReturnUrl}
+          />
         </main>
         <CheckoutFooter />
       </div>
@@ -445,7 +481,7 @@ function CheckoutPageInner() {
             brandColor={brandColor}
           />
 
-          {/* ── Initiate Error ── */}
+          {/* ── Initiate Error (resilient — no crash) ── */}
           {initiateError && (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
               <p className="text-sm text-destructive">{initiateError}</p>
@@ -457,11 +493,11 @@ function CheckoutPageInner() {
                 onClick={() => {
                   setInitiateError(null);
                   setSelectedMethod(null);
-                  setCheckoutResult(null);
+                  setInitiateResult(null);
                   setPhoneSubmitted(false);
                 }}
               >
-                {t("error.serverError").includes("Tente") ? "Tentar novamente" : "Try again"}
+                {t("error.tryAgain")}
               </Button>
             </div>
           )}
@@ -471,13 +507,14 @@ function CheckoutPageInner() {
             <div className="rounded-xl border border-border/50 bg-card p-8 flex flex-col items-center justify-center space-y-3">
               <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                {t("block.payment.title")}...
+                {t("initiate.processing")}
               </p>
             </div>
           )}
 
-          {/* ── Method-Specific Expanders ── */}
-          {/* Card: Stripe Payment Element */}
+          {/* ── Initiated View: Gateway-specific rendering based on response ── */}
+
+          {/* CARD → Stripe Payment Element (dynamic publicKey from providerAction) */}
           {selectedMethod?.id === "card" && stripeData && !initiating && (
             <CardPayment
               clientSecret={stripeData.clientSecret}
@@ -488,7 +525,7 @@ function CheckoutPageInner() {
             />
           )}
 
-          {/* MBWAY / Bizum: Phone input or waiting state */}
+          {/* MBWAY / BIZUM → Phone input → Waiting state */}
           {selectedMethod && PHONE_METHODS.includes(selectedMethod.id) && !initiating && (
             <PhonePayment
               method={selectedMethod.id}
@@ -499,7 +536,7 @@ function CheckoutPageInner() {
             />
           )}
 
-          {/* PIX: QR Code + Copy/Paste */}
+          {/* PIX → QR Code + Copy/Paste */}
           {selectedMethod?.id === "pix" && pixData && !initiating && (
             <AsyncPayment
               data={pixData}
@@ -509,13 +546,14 @@ function CheckoutPageInner() {
             />
           )}
 
-          {/* Multibanco: Entity + Reference */}
+          {/* MULTIBANCO → Entity + Reference + Close button */}
           {selectedMethod?.id === "multibanco" && multibancoData && !initiating && (
             <AsyncPayment
               data={multibancoData}
               session={session}
               brandColor={brandColor}
               variant="multibanco"
+              onClose={handleCloseMultibanco}
             />
           )}
         </div>
@@ -591,7 +629,7 @@ function CheckoutHeader({
             <X className="h-4 w-4" />
           </Button>
 
-          {/* Logo or store name */}
+          {/* Logo or store name (white-label) */}
           {session.logoUrl ? (
             <img
               src={session.logoUrl}

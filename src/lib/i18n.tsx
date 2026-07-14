@@ -71,6 +71,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "phone.placeholder": "+351 912 345 678",
     "phone.required": "Número de telemóvel é obrigatório",
     "phone.invalid": "Número de telemóvel inválido",
+    "phone.countryMismatch": "Número de telemóvel inválido para este método de pagamento",
     "phone.submit": "Confirmar Pagamento",
     "phone.submitting": "A submeter...",
     "phone.waitingTitle": "A aguardar aprovação",
@@ -94,16 +95,13 @@ const translations: Record<Locale, Record<string, string>> = {
     "multibanco.reference": "Referência",
     "multibanco.amount": "Montante",
     "multibanco.hint": "Pague na sua banca próxima ou via homebanking.",
+    "multibanco.close": "Fechar Checkout",
     "multibanco.copyEntity": "Copiar Entidade",
     "multibanco.copyRef": "Copiar Referência",
     "multibanco.copied": "Copiado",
 
-    // Success
-    "success.title": "Pagamento Confirmado!",
-    "success.thanks": "Obrigado pela sua compra em",
-    "success.email": "Enviámos um email de confirmação com os detalhes do pedido.",
-    "success.closeWindow": "Pode fechar esta janela",
-    "success.closeDesc": "A transação foi concluída com segurança.",
+    // Initiate
+    "initiate.processing": "A processar pagamento...",
 
     // Error
     "error.title": "Ops!",
@@ -111,6 +109,16 @@ const translations: Record<Locale, Record<string, string>> = {
     "error.loadFailed": "Não foi possível carregar o link de pagamento.",
     "error.serverError": "Erro de ligação ao servidor. Tente novamente.",
     "error.initiateFailed": "Não foi possível iniciar o pagamento.",
+    "error.tryAgain": "Tentar novamente",
+
+    // Success
+    "success.title": "Pagamento Confirmado!",
+    "success.thanks": "Obrigado pela sua compra em",
+    "success.email": "Enviámos um email de confirmação com os detalhes do pedido.",
+    "success.closeWindow": "Pode fechar esta janela",
+    "success.closeDesc": "A transação foi concluída com segurança.",
+    "success.redirecting": "Redirecionando em {s} segundos...",
+    "success.returnToMerchant": "Voltar à Loja",
 
     // Footer
     "footer.poweredBy": "Powered by",
@@ -164,6 +172,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "phone.placeholder": "+351 912 345 678",
     "phone.required": "Phone number is required",
     "phone.invalid": "Invalid phone number",
+    "phone.countryMismatch": "Invalid phone number for this payment method",
     "phone.submit": "Confirm Payment",
     "phone.submitting": "Submitting...",
     "phone.waitingTitle": "Waiting for approval",
@@ -189,6 +198,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "multibanco.hint": "Pay at your nearest ATM or via homebanking.",
     "multibanco.copyEntity": "Copy Entity",
     "multibanco.copyRef": "Copy Reference",
+    "multibanco.close": "Close Checkout",
     "multibanco.copied": "Copied",
 
     // Success
@@ -197,6 +207,11 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.email": "We sent a confirmation email with the order details.",
     "success.closeWindow": "You can close this window",
     "success.closeDesc": "The transaction has been completed safely.",
+    "success.redirecting": "Redirecting in {s} seconds...",
+    "success.returnToMerchant": "Return to Store",
+
+    // Initiate
+    "initiate.processing": "Processing payment...",
 
     // Error
     "error.title": "Oops!",
@@ -204,6 +219,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "error.loadFailed": "Could not load the payment link.",
     "error.serverError": "Server connection error. Please try again.",
     "error.initiateFailed": "Could not initiate the payment.",
+    "error.tryAgain": "Try again",
 
     // Footer
     "footer.poweredBy": "Powered by",
@@ -257,6 +273,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "phone.placeholder": "+34 612 345 678",
     "phone.required": "El número de teléfono es obligatorio",
     "phone.invalid": "Número de teléfono inválido",
+    "phone.countryMismatch": "Número de teléfono inválido para este método de pago",
     "phone.submit": "Confirmar Pago",
     "phone.submitting": "Enviando...",
     "phone.waitingTitle": "Esperando aprobación",
@@ -282,6 +299,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "multibanco.hint": "Paga en tu banco más cercano o vía homebanking.",
     "multibanco.copyEntity": "Copiar Entidad",
     "multibanco.copyRef": "Copiar Referencia",
+    "multibanco.close": "Cerrar Checkout",
     "multibanco.copied": "Copiado",
 
     // Success
@@ -290,6 +308,11 @@ const translations: Record<Locale, Record<string, string>> = {
     "success.email": "Hemos enviado un email de confirmación con los detalles del pedido.",
     "success.closeWindow": "Puede cerrar esta ventana",
     "success.closeDesc": "La transacción se ha completado con seguridad.",
+    "success.redirecting": "Redirigiendo en {s} segundos...",
+    "success.returnToMerchant": "Volver a la Tienda",
+
+    // Initiate
+    "initiate.processing": "Procesando pago...",
 
     // Error
     "error.title": "¡Ups!",
@@ -297,6 +320,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "error.loadFailed": "No se pudo cargar el enlace de pago.",
     "error.serverError": "Error de conexión al servidor. Inténtalo de nuevo.",
     "error.initiateFailed": "No se pudo iniciar el pago.",
+    "error.tryAgain": "Intentar de nuevo",
 
     // Footer
     "footer.poweredBy": "Powered by",
