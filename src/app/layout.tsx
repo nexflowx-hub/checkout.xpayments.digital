@@ -23,40 +23,37 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "XPayments — Checkout Seguro",
-    template: "%s | XPayments",
+    default: "Checkout Seguro",
+    template: "%s | Checkout",
   },
   description:
-    "Plataforma de checkout white-label multi-tenant. Pagamento seguro via Stripe (EUR/USD) e PIX (BRL) com smart routing.",
+    "Secure payment checkout platform. Multi-gateway smart routing.",
   keywords: [
-    "XPayments",
     "checkout",
     "payment",
-    "Stripe",
+    "secure",
     "PIX",
-    "MISTICPAY",
+    "MB WAY",
+    "Bizum",
     "white-label",
     "pagamento",
-    "checkout seguro",
     "gateway de pagamento",
   ],
-  authors: [{ name: "NexFlowX Hub", url: "https://xpayments.digital" }],
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
     apple: "/favicon.svg",
   },
   openGraph: {
-    title: "XPayments — Checkout Seguro",
-    description: "Plataforma de checkout white-label com Stripe e PIX.",
-    siteName: "XPayments",
+    title: "Secure Checkout",
+    description: "Multi-gateway secure payment platform.",
     type: "website",
     locale: "pt_PT",
-    alternateLocale: ["pt_BR", "en_US"],
+    alternateLocale: ["pt_BR", "en_US", "es_ES", "fr_FR"],
   },
   twitter: {
     card: "summary",
-    title: "XPayments — Checkout Seguro",
-    description: "Plataforma de checkout white-label com Stripe e PIX.",
+    title: "Secure Checkout",
+    description: "Multi-gateway secure payment platform.",
   },
   robots: {
     index: true,

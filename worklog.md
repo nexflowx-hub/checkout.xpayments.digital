@@ -142,3 +142,39 @@ Stage Summary:
 - Multibanco: close button sends PostMessage CLOSED and resets checkout state
 - Success screen: 3-second countdown → auto-redirect to merchant URL (or close window)
 - All states (SUCCESS, CLOSED, CANCELLED) properly communicated via PostMessage API
+---
+Task ID: 1
+Agent: Main Agent
+Task: Smart Drop-in V3 — Full implementation of premium universal checkout
+
+Work Log:
+- Analyzed entire existing codebase (14 active components, types, API client, i18n with 3 locales)
+- Rewrote src/types/checkout.ts: Added geolocation-based method filtering (COUNTRY_METHOD_PRIORITY), CheckoutStep type, LANG_TO_COUNTRY detection, PHONE_METHODS/INSTANT_METHODS constants, formatCountdown helper, PixCheckoutData.copyPaste/expiration fields, Apple Pay/Google Pay method stubs
+- Expanded src/lib/i18n.tsx: Added French (fr) locale, 80+ new translation keys for status screens/expired/white-label, removed all "Stripe" visible text, empty footer.poweredBy/footer.xpayments (white-label), added countryCode to I18nContext, changed default fallback from pt to en
+- Created src/hooks/use-country.ts: Browser locale-based country detection hook with useMemo
+- Created src/hooks/use-polling.ts: Payment status polling hook (3s interval, 200 max attempts, success/expired/error callbacks)
+- Created src/components/checkout/StatusScreen.tsx: Full status screen system (Processing with animated dots, Awaiting with pulsing rings, Expired with retry, Error with retry, Success with checkmark animation + progress bar + countdown redirect), all using framer-motion
+- Created src/components/checkout/CountdownTimer.tsx: Reusable countdown component (target date or duration, render prop pattern, expire callback, pause support) + CountdownBadge variant
+- Rewrote src/app/pay/[sessionId]/page.tsx: Complete V3 with CheckoutStep state machine (loading→checkout→processing→awaiting→success/error/expired/cancelled), geolocation-based PaymentWall, session expiration timer, polling integration for phone+PIX methods, AnimatePresence transitions, white-label header/footer
+- Polished src/components/checkout/OrderBlock.tsx: Fixed bug (was showing "Total a Pagar" instead of secure badge), added session countdown timer, framer-motion entrance animation, rounded-2xl design, description display
+- Rewrote src/components/checkout/PaymentWall.tsx: Geolocation-based filtering via useCountry, card gets full-width with dual brand icons (Visa+Mastercard), other methods in 2-col grid, spring-animated selection indicator, card brands note
+- Rewrote src/components/checkout/methods/CardPayment.tsx: Changed layout from "tabs" to "accordion", removed ALL "Stripe" text, generic "Secure payment with end-to-end encryption", better color defaults (#111111 instead of indigo), rounded-xl button
+- Rewrote src/components/checkout/methods/PhonePayment.tsx: Framer-motion animations, locale-aware placeholder (es-ES for Bizum), pulsing ring animation for waiting state, indeterminate progress bar
+- Rewrote src/components/checkout/methods/AsyncPayment.tsx: Reusable CopyButton component, spring-animated check icon, PIX QR code with motion entrance, Multibanco with uppercase tracking-widest labels, amount copy button
+- Rewrote src/components/checkout/CustomerBlock.tsx: Added expandable optional fields (phone, company, address, city, postal code, country, VAT) with AnimatePresence height animation, country auto-detection, chevron toggle
+- Updated src/components/checkout/StripeErrorBoundary.tsx: White-label fallback text (no gateway names)
+- Updated src/app/globals.css: Custom scrollbar styling, CSS rule to hide Stripe "Powered by" branding, refined dark theme border opacity
+- Rewrote src/app/page.tsx: Professional XPayments landing with feature cards (Smart Routing, Multi-Country, White-Label)
+- Updated src/app/layout.tsx: Removed all "Stripe" and "MISTICPAY" from metadata, white-label title/description
+- All code passes ESLint with zero errors
+
+Stage Summary:
+- Full V3 Smart Drop-in checkout implemented with premium UX
+- Geolocation-based payment method filtering (PT→Card/MBWAY/Multibanco, ES→Card/Bizum, BR→PIX/Card, EU→Card only)
+- 4-language support (PT/EN/ES/FR) with auto-detection
+- White-label: zero gateway names visible to customers
+- Framer-motion animations throughout (page transitions, selection indicators, pulsing effects, success checkmark)
+- Session expiration countdown
+- Payment status polling for async methods
+- Expandable customer form with optional fields
+- Clean component architecture: components/checkout/, components/checkout/methods/, hooks/, types/

@@ -9,14 +9,15 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { useTheme } from "next-themes";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, Shield, AlertTriangle, CreditCard } from "lucide-react";
 import { StripeErrorBoundary } from "@/components/checkout/StripeErrorBoundary";
 import { useI18n } from "@/lib/i18n";
 
-// ── Inner Stripe Checkout Form ──
+// ── Inner Checkout Form ──
 
-function StripeCheckoutForm({
+function CheckoutForm({
   returnUrl,
   amount,
   brandColor,
@@ -55,18 +56,28 @@ function StripeCheckoutForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement options={{ layout: "tabs" }} />
+    <motion.form
+      onSubmit={handleSubmit}
+      className="space-y-4"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
+      <PaymentElement options={{ layout: "accordion" }} />
 
       {message && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
+        <motion.div
+          className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
           <p className="text-sm text-destructive">{message}</p>
-        </div>
+        </motion.div>
       )}
 
       <Button
         type="submit"
-        className="w-full h-12 text-sm font-semibold gap-2"
+        className="w-full h-12 text-sm font-semibold gap-2 rounded-xl"
         style={brandColor ? { backgroundColor: brandColor, color: "#fff" } : undefined}
         disabled={!stripe || !elements || isLoading}
       >
@@ -78,24 +89,24 @@ function StripeCheckoutForm({
         ) : (
           <>
             <Lock className="h-4 w-4" />
-            {t("card.payNow")} — {amount}
+            {amount ? t("card.payNowAmount").replace("{amount}", amount) : t("card.payNow")}
           </>
         )}
       </Button>
 
       <div className="flex items-center justify-center gap-2 pt-1">
-        <Shield className="h-3 w-3 text-muted-foreground" />
-        <p className="text-[11px] text-muted-foreground">
+        <Shield className="h-3 w-3 text-muted-foreground/50" />
+        <p className="text-[11px] text-muted-foreground/50">
           {t("card.encrypted")}
         </p>
       </div>
-    </form>
+    </motion.form>
   );
 }
 
 // ── Fallbacks ──
 
-function StripeKeyMissing() {
+function KeyMissing() {
   const { t } = useI18n();
 
   return (
@@ -109,7 +120,7 @@ function StripeKeyMissing() {
   );
 }
 
-function StripeCrashFallback() {
+function CrashFallback() {
   const { t } = useI18n();
 
   return (
@@ -154,23 +165,23 @@ export function CardPayment({
       appearance: {
         theme: isDark ? "night" : "stripe",
         variables: {
-          colorPrimary: brandColor || "#6366f1",
+          colorPrimary: brandColor || "#111111",
           colorBackground: isDark ? "#09090b" : "#ffffff",
           colorText: isDark ? "#fafafa" : "#1a1a1a",
           colorTextSecondary: isDark ? "#a1a1aa" : "#6b7280",
           colorDanger: "#ef4444",
           fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-          borderRadius: "8px",
+          borderRadius: "10px",
           spacingBranding: "none",
         },
         ...(isDark && {
           rules: {
-            ".Label": { color: "#a1a1aa", fontSize: "12px", fontWeight: "500" },
-            ".Input": { backgroundColor: "#09090b", borderColor: "#27272a" },
-            ".Input:focus": { borderColor: brandColor || "#6366f1" },
+            ".Label": { color: "#a1a1aa", fontSize: "13px", fontWeight: "500" },
+            ".Input": { backgroundColor: "#0a0a0a", borderColor: "#27272a" },
+            ".Input:focus": { borderColor: brandColor || "#111111" },
             ".Tab": { color: "#a1a1aa" },
             ".Tab:hover": { color: "#fafafa" },
-            ".Tab--selected": { color: "#fafafa", borderColor: brandColor || "#6366f1" },
+            ".Tab--selected": { color: "#fafafa", borderColor: brandColor || "#111111" },
           },
         }),
       },
@@ -179,20 +190,25 @@ export function CardPayment({
   );
 
   if (!publicKey || !stripePromise) {
-    return <StripeKeyMissing />;
+    return <KeyMissing />;
   }
 
   return (
-    <div className="rounded-xl border border-foreground/10 bg-muted/20 p-4 sm:p-5">
-      <StripeErrorBoundary fallback={<StripeCrashFallback />}>
+    <motion.div
+      className="rounded-2xl border border-foreground/[0.06] bg-muted/20 p-4 sm:p-5"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
+      <StripeErrorBoundary fallback={<CrashFallback />}>
         <Elements stripe={stripePromise} options={options}>
-          <StripeCheckoutForm
+          <CheckoutForm
             returnUrl={returnUrl}
             amount={amount}
             brandColor={brandColor}
           />
         </Elements>
       </StripeErrorBoundary>
-    </div>
+    </motion.div>
   );
 }

@@ -3,6 +3,8 @@
 export interface SessionMetadata {
   theme?: string;
   returnUrl?: string;
+  description?: string;
+  expiresAt?: string;
   [key: string]: unknown;
 }
 
@@ -12,15 +14,30 @@ export interface CheckoutSession {
   amount: number;
   currency: string;
   reference?: string;
-  // Optional branding (may not be returned by V3)
+  description?: string;
+  // Optional branding
   logoUrl?: string;
   primaryColor?: string;
   storeId?: string;
-  // Optional metadata (theme control, returnUrl, etc.)
+  // Optional metadata
   metadata?: SessionMetadata;
   // Merchant return URL for post-payment redirect
   returnUrl?: string;
+  // Session expiration
+  expiresAt?: string;
 }
+
+// ── Checkout Flow Steps ──
+
+export type CheckoutStep =
+  | "loading"
+  | "checkout"
+  | "processing"
+  | "awaiting"
+  | "success"
+  | "error"
+  | "expired"
+  | "cancelled";
 
 // ── Payment Method Types ──
 
@@ -30,22 +47,28 @@ export type PaymentMethodType =
   | "bizum"
   | "multibanco"
   | "pix"
-  | "usdt";
+  | "usdt"
+  | "apple_pay"
+  | "google_pay";
 
 export interface PaymentMethodOption {
   id: PaymentMethodType;
-  labelKey: string;        // i18n key for label
-  icon: string;            // path to SVG in /icons/
-  currencies: string[];    // which currencies show this method
-  comingSoon?: boolean;    // placeholder (e.g. USDT)
+  labelKey: string;
+  icon: string;
+  currencies: string[];
+  countries?: string[];       // ISO 3166-1 alpha-2
+  comingSoon?: boolean;
+  /** Secondary icon (e.g., mastercard alongside visa for "card") */
+  iconSecondary?: string;
 }
 
-/** All available payment methods */
+/** All available payment methods — ordered by importance */
 export const PAYMENT_METHODS: PaymentMethodOption[] = [
   {
     id: "card",
     labelKey: "method.card",
     icon: "/icons/visa.svg",
+    iconSecondary: "/icons/mastercard.svg",
     currencies: ["EUR", "BRL", "USD"],
   },
   {
@@ -53,24 +76,28 @@ export const PAYMENT_METHODS: PaymentMethodOption[] = [
     labelKey: "method.mbway",
     icon: "/icons/mbway.svg",
     currencies: ["EUR"],
+    countries: ["PT"],
   },
   {
     id: "bizum",
     labelKey: "method.bizum",
     icon: "/icons/bizum.svg",
     currencies: ["EUR"],
+    countries: ["ES"],
   },
   {
     id: "multibanco",
     labelKey: "method.multibanco",
     icon: "/icons/mastercard.svg",
     currencies: ["EUR"],
+    countries: ["PT"],
   },
   {
     id: "pix",
     labelKey: "method.pix",
     icon: "/icons/pix.svg",
     currencies: ["BRL"],
+    countries: ["BR"],
   },
   {
     id: "usdt",
@@ -79,14 +106,99 @@ export const PAYMENT_METHODS: PaymentMethodOption[] = [
     currencies: ["USD"],
     comingSoon: true,
   },
+  {
+    id: "apple_pay",
+    labelKey: "method.applePay",
+    icon: "/icons/apple-pay.svg",
+    currencies: ["EUR", "USD", "BRL"],
+    comingSoon: true,
+  },
+  {
+    id: "google_pay",
+    labelKey: "method.googlePay",
+    icon: "/icons/apple-pay.svg",
+    currencies: ["EUR", "USD", "BRL"],
+    comingSoon: true,
+  },
 ];
 
-/** Filter payment methods by currency */
+/**
+ * Country → payment method priority order.
+ * Used for geolocation-based method filtering and ordering.
+ */
+export const COUNTRY_METHOD_PRIORITY: Record<string, PaymentMethodType[]> = {
+  PT: ["card", "mbway", "multibanco"],
+  ES: ["card", "bizum"],
+  BR: ["pix", "card"],
+  FR: ["card"],
+  DE: ["card"],
+  IT: ["card"],
+  GB: ["card"],
+  US: ["card"],
+  IE: ["card"],
+  NL: ["card"],
+  BE: ["card"],
+  LU: ["card"],
+  CH: ["card"],
+  AO: ["card"],
+  MZ: ["card"],
+  CV: ["card"],
+};
+
+/**
+ * Filter and order payment methods for a given currency and country.
+ * Country takes priority for ordering. Currency is the hard filter.
+ * Falls back to currency-only if country has no mapping.
+ */
+export function getPaymentMethods(
+  currency: string,
+  countryCode?: string
+): PaymentMethodOption[] {
+  const upper = currency.toUpperCase();
+
+  // Step 1: Filter by currency and remove "coming soon"
+  const available = PAYMENT_METHODS.filter(
+    (m) => m.currencies.includes(upper) && !m.comingSoon
+  );
+
+  // Step 2: If country is detected, apply country-based filtering
+  if (countryCode) {
+    const countryOrder = COUNTRY_METHOD_PRIORITY[countryCode.toUpperCase()];
+
+    if (countryOrder) {
+      // Filter to only methods allowed for this country + currency
+      const countryMethods = available.filter((m) => {
+        // If method has no country restriction, it's available everywhere
+        if (!m.countries || m.countries.length === 0) return true;
+        return m.countries.includes(countryCode.toUpperCase());
+      });
+
+      // Sort by country priority
+      const ordered: PaymentMethodOption[] = [];
+      for (const methodId of countryOrder) {
+        const found = countryMethods.find((m) => m.id === methodId);
+        if (found) ordered.push(found);
+      }
+
+      // Add any remaining methods not in the priority list
+      for (const m of countryMethods) {
+        if (!ordered.find((o) => o.id === m.id)) {
+          ordered.push(m);
+        }
+      }
+
+      return ordered.length > 0 ? ordered : available;
+    }
+  }
+
+  return available;
+}
+
+/** Legacy alias for backwards compatibility */
 export function getPaymentMethodsForCurrency(
   currency: string
 ): PaymentMethodOption[] {
-  const upper = currency.toUpperCase();
-  return PAYMENT_METHODS.filter((m) => m.currencies.includes(upper));
+  return getPaymentMethods(currency);
 }
 
 // ── Customer (V3 — name + email required; phone optional for MBWAY/Bizum) ──
@@ -95,6 +207,18 @@ export interface CustomerPayload {
   name: string;
   email: string;
   phone?: string;
+}
+
+export interface CustomerForm {
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  country?: string;
+  company?: string;
+  vatId?: string;
 }
 
 // ── V3 Initiate Payment Request ──
@@ -118,10 +242,13 @@ export interface StripeCheckoutData {
 export interface PixCheckoutData {
   pixString?: string;
   pixCode?: string;
+  pixKey?: string;
+  copyPaste?: string;
   providerTxId: string;
   qrCode?: string;
   qrCodeBase64?: string;
   expiresAt?: string;
+  expiration?: number;  // seconds until expiration
 }
 
 export interface MultibancoCheckoutData {
@@ -153,8 +280,6 @@ export type CheckoutData =
  *     }
  *   }
  * }
- *
- * We normalise this into { gateway, checkoutData } for the UI layer.
  */
 export interface InitiateCheckoutResponse {
   success: boolean;
@@ -164,13 +289,12 @@ export interface InitiateCheckoutResponse {
       checkoutData?: CheckoutData;
       [key: string]: unknown;
     };
-    // Backwards-compatible: checkoutData directly under data
     checkoutData?: CheckoutData;
     [key: string]: unknown;
   };
 }
 
-/** Normalised result returned to the page — always { gateway, checkoutData } */
+/** Normalised result returned to the page */
 export interface NormalisedInitiateResult {
   gateway: string;
   checkoutData: CheckoutData;
@@ -178,17 +302,11 @@ export interface NormalisedInitiateResult {
 
 // ── Phone Validation ──
 
-/** Country prefix mapping for phone-based methods */
 export const PHONE_COUNTRY_PREFIXES: Record<string, { country: string; prefix: string; digits: number }> = {
   mbway: { country: "PT", prefix: "+351", digits: 9 },
   bizum: { country: "ES", prefix: "+34", digits: 9 },
 };
 
-/**
- * Validate phone number for a specific payment method.
- * MBWAY requires PT (+351), BIZUM requires ES (+34).
- * Returns an error key (for i18n) or null if valid.
- */
 export function validatePhoneForMethod(
   phone: string,
   method: PaymentMethodType
@@ -198,12 +316,9 @@ export function validatePhoneForMethod(
   if (!/^\+?\d{7,15}$/.test(cleaned)) return "phone.invalid";
 
   const rule = PHONE_COUNTRY_PREFIXES[method];
-  if (!rule) return null; // No country restriction for unknown methods
+  if (!rule) return null;
 
-  // Check if the phone starts with the required prefix
   const hasPrefix = cleaned.startsWith(rule.prefix);
-  // Also accept numbers without prefix that match the expected digit count
-  // (e.g., "912345678" for PT without +351)
   const digitsOnly = cleaned.replace(/^\+/, "");
   const digitCount = digitsOnly.replace(/^351|^34/, "").length;
 
@@ -217,28 +332,10 @@ export function validatePhoneForMethod(
     }
   }
 
-  return null; // Valid
+  return null;
 }
 
 // ── Type Guards ──
-
-export function isStripeGateway(gateway: GatewayType): boolean {
-  return gateway.toUpperCase().includes("STRIPE");
-}
-
-export function isPixGateway(gateway: GatewayType): boolean {
-  const upper = gateway.toUpperCase();
-  return upper.includes("MISTIC") || upper.includes("PIX");
-}
-
-export function isMultibancoGateway(gateway: GatewayType): boolean {
-  return gateway.toUpperCase().includes("MULTIBANCO");
-}
-
-export function isPhoneGateway(gateway: GatewayType): boolean {
-  const upper = gateway.toUpperCase();
-  return upper.includes("MBWAY") || upper.includes("BIZUM");
-}
 
 export function isStripeCheckoutData(
   data: CheckoutData
@@ -249,7 +346,7 @@ export function isStripeCheckoutData(
 export function isPixCheckoutData(
   data: CheckoutData
 ): data is PixCheckoutData {
-  return "pixString" in data || "pixCode" in data;
+  return "pixString" in data || "pixCode" in data || "copyPaste" in data;
 }
 
 export function isMultibancoCheckoutData(
@@ -261,15 +358,13 @@ export function isMultibancoCheckoutData(
 export function isPhoneCheckoutData(
   data: CheckoutData
 ): data is PhoneCheckoutData {
-  return !("clientSecret" in data) && !("pixString" in data) && !("pixCode" in data) && !("entity" in data);
+  return !("clientSecret" in data) && !("pixString" in data) && !("pixCode" in data) && !("copyPaste" in data) && !("entity" in data);
 }
 
-/** Get the PIX string from either pixString or pixCode field */
 export function getPixCode(data: PixCheckoutData): string {
-  return data.pixString || data.pixCode || "";
+  return data.pixString || data.pixCode || data.copyPaste || "";
 }
 
-/** Check if the qrCode field looks like a URL or data URI (image) */
 export function isQrCodeImage(qrCode: string | undefined): boolean {
   if (!qrCode) return false;
   return qrCode.startsWith("http") || qrCode.startsWith("data:");
@@ -281,3 +376,48 @@ export function formatCurrency(amount: number, currency: string): string {
     currency,
   }).format(amount);
 }
+
+/** Format countdown as MM:SS */
+export function formatCountdown(ms: number): string {
+  if (ms <= 0) return "00:00";
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+// ── Country Detection ──
+
+/** Map browser language codes to ISO country codes */
+export const LANG_TO_COUNTRY: Record<string, string> = {
+  pt: "PT", "pt-pt": "PT", "pt-br": "BR",
+  en: "US", "en-us": "US", "en-gb": "GB", "en-ie": "IE",
+  es: "ES", "es-es": "ES",
+  fr: "FR", "fr-fr": "FR", "fr-be": "BE",
+  de: "DE", "de-de": "DE", "de-at": "DE", "de-ch": "CH",
+  it: "IT", "it-it": "IT",
+  nl: "NL", "nl-nl": "NL", "nl-be": "BE",
+  lu: "LU",
+  ao: "AO", mz: "MZ", cv: "CV",
+};
+
+/**
+ * Detect country from browser locale.
+ * Returns ISO 3166-1 alpha-2 code.
+ */
+export function detectCountryFromLocale(): string {
+  try {
+    const lang = typeof navigator !== "undefined" ? (navigator.language || "pt-PT") : "pt-PT";
+    const normalized = lang.toLowerCase().trim();
+    return LANG_TO_COUNTRY[normalized] || "PT";
+  } catch {
+    return "PT";
+  }
+}
+
+// ── Methods that require phone input before initiating ──
+
+export const PHONE_METHODS: PaymentMethodType[] = ["mbway", "bizum"];
+
+/** Methods that initiate immediately on click */
+export const INSTANT_METHODS: PaymentMethodType[] = ["card", "pix", "multibanco"];

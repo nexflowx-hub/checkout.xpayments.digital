@@ -16,9 +16,8 @@ interface StripeErrorBoundaryState {
 }
 
 /**
- * React Error Boundary that catches render-time crashes from Stripe <Elements>.
- * When Stripe SDK rejects an invalid clientSecret or publishableKey,
- * instead of a white screen, we show a graceful fallback.
+ * React Error Boundary that catches render-time crashes from payment elements.
+ * Shows a graceful white-label fallback — no gateway names exposed.
  */
 export class StripeErrorBoundary extends Component<
   StripeErrorBoundaryProps,
@@ -34,7 +33,7 @@ export class StripeErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("[StripeErrorBoundary] Stripe Elements crashed:", error, info);
+    console.error("[PaymentElementBoundary] Payment element crashed:", error, info);
   }
 
   render() {
@@ -42,13 +41,13 @@ export class StripeErrorBoundary extends Component<
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      return <DefaultStripeFallback />;
+      return <DefaultFallback />;
     }
     return this.props.children;
   }
 }
 
-function DefaultStripeFallback() {
+function DefaultFallback() {
   return (
     <div className="py-10 text-center space-y-3">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
@@ -56,11 +55,11 @@ function DefaultStripeFallback() {
       </div>
       <div className="space-y-1.5">
         <p className="text-sm font-medium text-foreground">
-          Aguardando configuração do Gateway pelo Lojista
+          Payment method unavailable
         </p>
         <p className="text-xs text-muted-foreground leading-relaxed">
-          O Stripe não conseguiu inicializar o pagamento.
-          Tente novamente mais tarde.
+          Could not initialize the payment method.
+          Please try again later.
         </p>
       </div>
     </div>

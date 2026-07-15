@@ -1,23 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Phone, Loader2, Smartphone, CheckCircle2 } from "lucide-react";
+import { Phone, Loader2, CheckCircle2 } from "lucide-react";
 import type { PaymentMethodType } from "@/types/checkout";
 import { validatePhoneForMethod } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
 
 interface PhonePaymentProps {
-  method: PaymentMethodType; // "mbway" | "bizum"
+  method: PaymentMethodType;
   brandColor: string;
   onSubmit: (phone: string) => void;
   isSubmitting: boolean;
   isWaiting: boolean;
 }
 
-/** Method-specific phone placeholders */
 const METHOD_PLACEHOLDERS: Record<string, string> = {
   mbway: "+351 912 345 678",
   bizum: "+34 612 345 678",
@@ -30,8 +30,7 @@ export function PhonePayment({
   isSubmitting,
   isWaiting,
 }: PhonePaymentProps) {
-  const { t } = useI18n();
-
+  const { t, locale } = useI18n();
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -51,25 +50,42 @@ export function PhonePayment({
     onSubmit(phone.trim());
   }
 
-  const placeholder = METHOD_PLACEHOLDERS[method] ?? t("phone.placeholder");
+  // Use locale-specific placeholder for bizum in Spanish
+  const placeholder = method === "bizum" && locale === "es"
+    ? t("phone.placeholder.es")
+    : (METHOD_PLACEHOLDERS[method] ?? t("phone.placeholder"));
 
   // Waiting for approval state
   if (isWaiting) {
     return (
-      <div className="rounded-xl border border-foreground/10 bg-muted/20 p-6 sm:p-8">
-        <div className="flex flex-col items-center text-center space-y-4">
-          {/* Animated spinner icon */}
-          <div
-            className="relative flex items-center justify-center h-16 w-16 rounded-full"
-            style={{ backgroundColor: `${brandColor}12` }}
-          >
-            <Smartphone
-              className="h-7 w-7"
-              style={{ color: brandColor }}
-            />
+      <motion.div
+        className="rounded-2xl border border-foreground/[0.06] bg-muted/20 p-6 sm:p-8"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        <div className="flex flex-col items-center text-center space-y-5">
+          {/* Animated phone icon */}
+          <div className="relative">
             <div
-              className="absolute inset-0 rounded-full animate-ping opacity-20"
-              style={{ backgroundColor: brandColor }}
+              className="flex items-center justify-center h-16 w-16 sm:h-18 sm:w-18 rounded-full"
+              style={{ backgroundColor: `${brandColor}10` }}
+            >
+              <Phone className="h-7 w-7 sm:h-8 sm:w-8" style={{ color: brandColor }} />
+            </div>
+
+            {/* Pulsing rings */}
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              style={{ border: `2px solid ${brandColor}25` }}
+              animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+            />
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              style={{ border: `2px solid ${brandColor}15` }}
+              animate={{ scale: [1, 1.8], opacity: [0.3, 0] }}
+              transition={{ duration: 2, repeat: Infinity, delay: 0.6, ease: "easeOut" }}
             />
           </div>
 
@@ -82,40 +98,33 @@ export function PhonePayment({
             </p>
           </div>
 
-          {/* Progress indicator */}
+          {/* Indeterminate progress */}
           <div className="w-48 h-1 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]"
-              style={{
-                backgroundColor: brandColor,
-                width: "40%",
-                animation: "indeterminate 1.5s ease-in-out infinite",
-              }}
+            <motion.div
+              className="h-full rounded-full"
+              style={{ backgroundColor: brandColor, width: "40%" }}
+              animate={{ x: ["-100%", "350%"] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
             />
           </div>
 
-          <p className="text-xs text-muted-foreground/80 max-w-[260px]">
+          <p className="text-xs text-muted-foreground/60 max-w-[260px]">
             {t("phone.waitingHint")}
           </p>
         </div>
-
-        {/* Inline animation keyframes */}
-        <style>{`
-          @keyframes indeterminate {
-            0% { transform: translateX(-100%); }
-            50% { transform: translateX(200%); }
-            100% { transform: translateX(-100%); }
-          }
-        `}</style>
-      </div>
+      </motion.div>
     );
   }
 
   // Phone input form
   return (
-    <div className="rounded-xl border border-foreground/10 bg-muted/20 p-4 sm:p-5">
+    <motion.div
+      className="rounded-2xl border border-foreground/[0.06] bg-muted/20 p-4 sm:p-5"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Phone input */}
         <div className="space-y-1.5">
           <Label
             htmlFor={`phone-${method}`}
@@ -134,21 +143,26 @@ export function PhonePayment({
                 setPhone(e.target.value);
                 if (error) setError(null);
               }}
-              className="pl-10 h-11"
+              className="pl-10 h-11 rounded-lg"
               aria-invalid={!!error}
               disabled={isSubmitting}
               autoFocus
             />
           </div>
           {error && (
-            <p className="text-xs text-destructive">{error}</p>
+            <motion.p
+              className="text-xs text-destructive"
+              initial={{ opacity: 0, y: -2 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {error}
+            </motion.p>
           )}
         </div>
 
-        {/* Submit */}
         <Button
           type="submit"
-          className="w-full h-11 text-sm font-semibold gap-2"
+          className="w-full h-11 text-sm font-semibold gap-2 rounded-xl"
           style={{ backgroundColor: brandColor, color: "#fff" }}
           disabled={isSubmitting}
         >
@@ -165,6 +179,6 @@ export function PhonePayment({
           )}
         </Button>
       </form>
-    </div>
+    </motion.div>
   );
 }

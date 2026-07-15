@@ -6,11 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
   ShieldCheck,
-  CheckCircle2,
-  XCircle,
-  Loader2,
   X,
+  RotateCcw,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "next-themes";
 import { OrderBlock } from "@/components/checkout/OrderBlock";
 import { CustomerBlock } from "@/components/checkout/CustomerBlock";
@@ -18,8 +17,11 @@ import { PaymentWall } from "@/components/checkout/PaymentWall";
 import { CardPayment } from "@/components/checkout/methods/CardPayment";
 import { PhonePayment } from "@/components/checkout/methods/PhonePayment";
 import { AsyncPayment } from "@/components/checkout/methods/AsyncPayment";
+import { StatusScreen } from "@/components/checkout/StatusScreen";
 import { LanguageSelector } from "@/components/checkout/LanguageSelector";
 import { I18nProvider, useI18n } from "@/lib/i18n";
+import { useCountry } from "@/hooks/use-country";
+import { usePolling } from "@/hooks/use-polling";
 import { getSession, initiatePayment } from "@/lib/api-client";
 import type {
   CheckoutSession,
@@ -30,15 +32,18 @@ import type {
   StripeCheckoutData,
   PixCheckoutData,
   MultibancoCheckoutData,
+  CheckoutStep,
 } from "@/types/checkout";
 import {
   formatCurrency,
   isStripeCheckoutData,
   isPixCheckoutData,
   isMultibancoCheckoutData,
+  PHONE_METHODS,
+  INSTANT_METHODS,
 } from "@/types/checkout";
 
-// ── PostMessage helpers (iframe ↔ parent window) ──
+// ── PostMessage helpers ──
 
 function notifyParent(status: "SUCCESS" | "CLOSED" | "CANCELLED") {
   if (typeof window !== "undefined" && window.parent !== window) {
@@ -50,21 +55,13 @@ function notifyParent(status: "SUCCESS" | "CLOSED" | "CANCELLED") {
 
 function usePaymentStatus() {
   const searchParams = useSearchParams();
-  const statusParam = searchParams.get("status");
   return useMemo<"success" | "cancelled" | null>(() => {
-    if (statusParam === "success") return "success";
-    if (statusParam === "cancelled") return "cancelled";
+    const s = searchParams.get("status");
+    if (s === "success") return "success";
+    if (s === "cancelled") return "cancelled";
     return null;
-  }, [statusParam]);
+  }, [searchParams]);
 }
-
-// ── Methods that require phone input before initiating ──
-
-const PHONE_METHODS: PaymentMethodType[] = ["mbway", "bizum"];
-
-// ── Methods that initiate immediately on click ──
-
-const INSTANT_METHODS: PaymentMethodType[] = ["card", "pix", "multibanco"];
 
 // ── Loading Skeleton ──
 
@@ -72,161 +69,51 @@ function CheckoutSkeleton() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Header skeleton */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
         <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Skeleton className="h-7 w-7 rounded-md" />
-            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-7 w-7 rounded-lg" />
+            <Skeleton className="h-4 w-28" />
           </div>
-          <Skeleton className="h-5 w-16" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-16 rounded-md" />
+            <Skeleton className="h-3 w-16" />
+          </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6 space-y-4">
         {/* Block A skeleton */}
-        <div className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-10 w-40 mx-auto" />
+        <div className="rounded-2xl border border-border/30 bg-card p-5 space-y-3">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <Skeleton className="h-14 w-48 mx-auto rounded-xl" />
           <Skeleton className="h-3 w-20" />
         </div>
 
         {/* Block B skeleton */}
-        <div className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
-          <Skeleton className="h-4 w-40" />
+        <div className="rounded-2xl border border-border/30 bg-card p-5 space-y-3">
+          <Skeleton className="h-4 w-36" />
           <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full rounded-lg" />
+            <Skeleton className="h-11 w-full rounded-lg" />
           </div>
         </div>
 
         {/* Block C skeleton */}
-        <div className="rounded-xl border border-border/50 bg-card p-5 space-y-3">
-          <Skeleton className="h-4 w-48" />
+        <div className="rounded-2xl border border-border/30 bg-card p-5 space-y-3">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-24 w-full rounded-xl" />
           <div className="grid grid-cols-2 gap-2.5">
-            <Skeleton className="h-24 w-full rounded-xl" />
-            <Skeleton className="h-24 w-full rounded-xl" />
             <Skeleton className="h-24 w-full rounded-xl" />
             <Skeleton className="h-24 w-full rounded-xl" />
           </div>
         </div>
       </main>
 
-      <CheckoutFooter />
-    </div>
-  );
-}
-
-// ── Success Screen ──
-
-const REDIRECT_SECONDS = 3;
-
-function SuccessScreen({ storeName, returnUrl }: { storeName: string; returnUrl?: string }) {
-  const { t } = useI18n();
-  const [countdown, setCountdown] = useState(REDIRECT_SECONDS);
-
-  useEffect(() => {
-    notifyParent("SUCCESS");
-  }, []);
-
-  // Countdown + auto-redirect
-  useEffect(() => {
-    if (countdown <= 0) {
-      // Redirect to merchant return URL, or close the window
-      if (returnUrl) {
-        window.location.href = returnUrl;
-      } else {
-        notifyParent("CLOSED");
-        try { window.close(); } catch {}
-      }
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setCountdown((prev) => prev - 1);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [countdown, returnUrl]);
-
-  const handleClose = useCallback(() => {
-    notifyParent("CLOSED");
-    if (returnUrl) {
-      window.location.href = returnUrl;
-    } else {
-      try { window.close(); } catch {}
-    }
-  }, [returnUrl]);
-
-  const progressPct = ((REDIRECT_SECONDS - countdown) / REDIRECT_SECONDS) * 100;
-
-  return (
-    <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center space-y-6">
-      <div
-        className="relative flex items-center justify-center h-20 w-20 rounded-full animate-[success-pop_0.5s_ease-out]"
-        style={{ backgroundColor: "#22c55e15" }}
-      >
-        <CheckCircle2 className="h-10 w-10" style={{ color: "#22c55e" }} />
-      </div>
-
-      <div className="space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          {t("success.title")}
-        </h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {t("success.thanks")}{" "}
-          <span className="text-foreground font-medium">{storeName}</span>.
-        </p>
-      </div>
-
-      <p className="text-xs text-muted-foreground max-w-[300px]">
-        {t("success.email")}
-      </p>
-
-      <div className="w-full max-w-[320px] space-y-3 pt-1">
-        {/* Progress bar */}
-        <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-1000 ease-linear"
-            style={{ width: `${progressPct}%`, backgroundColor: "#22c55e" }}
-          />
-        </div>
-
-        {/* Redirecting countdown or close message */}
-        {returnUrl && countdown > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {t("success.redirecting").replace("{s}", String(countdown))}
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground">{t("success.closeDesc")}</p>
-        )}
-
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full h-10 text-xs font-medium"
-          onClick={handleClose}
-        >
-          {returnUrl ? t("success.returnToMerchant") : t("success.closeWindow")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ── Error Screen ──
-
-function ErrorScreen({ message }: { message: string }) {
-  const { t } = useI18n();
-
-  return (
-    <div className="flex flex-col items-center justify-center py-10 sm:py-16 text-center space-y-5 px-4">
-      <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-destructive/10">
-        <XCircle className="h-8 w-8 text-destructive" />
-      </div>
-      <div className="space-y-2 max-w-sm">
-        <h1 className="text-xl font-bold text-foreground">{t("error.title")}</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">{message}</p>
-      </div>
+      <MinimalFooter />
     </div>
   );
 }
@@ -239,41 +126,34 @@ function CheckoutPageInner() {
   const params = useParams<{ sessionId: string }>();
   const searchParams = useSearchParams();
   const paymentStatus = usePaymentStatus();
+  const countryCode = useCountry();
+
+  // ── Step state ──
+  const [step, setStep] = useState<CheckoutStep>("loading");
 
   // ── Session state ──
   const [session, setSession] = useState<CheckoutSession | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Customer state (Block B) ──
+  // ── Customer state ──
   const [customerValid, setCustomerValid] = useState(false);
   const [customerData, setCustomerData] = useState({ name: "", email: "" });
 
-  // ── Payment state (Block C) ──
+  // ── Payment state ──
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
   const [initiateResult, setInitiateResult] = useState<NormalisedInitiateResult | null>(null);
   const [phoneSubmitted, setPhoneSubmitted] = useState(false);
 
-  // ── Theme control: URL param > session.metadata.theme === 'dark' > default "light" ──
-  // Dark mode is ONLY activated when the API returns theme: 'dark' or ?theme=dark is set.
-  // No user toggle. No system preference. Merchant-controlled.
+  // ── Theme: merchant-controlled only ──
   useEffect(() => {
     const forced = searchParams.get("theme");
-    if (forced === "dark") {
-      setTheme("dark");
-      return; // URL param takes precedence
-    }
-    // Check session metadata for theme preference
+    if (forced === "dark") { setTheme("dark"); return; }
     if (session?.metadata?.theme) {
       const theme = session.metadata.theme.toLowerCase();
-      if (theme === "dark") {
-        setTheme("dark");
-        return;
-      }
+      if (theme === "dark") { setTheme("dark"); return; }
     }
-    // No dark preference — always reset to light (merchant default)
     setTheme("light");
   }, [searchParams, session?.metadata?.theme, setTheme]);
 
@@ -281,26 +161,41 @@ function CheckoutPageInner() {
   useEffect(() => {
     async function load() {
       const sid = params?.sessionId;
-      if (!sid) {
-        console.warn("[checkout] sessionId is undefined — router not ready");
-        return;
-      }
+      if (!sid) return;
 
       try {
-        console.log("[checkout] Fetching session:", sid);
         const data = await getSession(sid);
-        console.log("[checkout] Normalised session:", JSON.stringify(data, null, 2));
         setSession(data);
+        setStep("checkout");
       } catch (err) {
         console.error("[checkout] Fetch failed:", err);
         setError(err instanceof Error ? err.message : t("error.loadFailed"));
-      } finally {
-        setLoading(false);
+        setStep("error");
       }
     }
-
     load();
   }, [params?.sessionId, t]);
+
+  // ── Payment status polling (for phone methods + PIX) ──
+  const isPollingTarget = step === "awaiting" || (step === "checkout" && initiateResult && (
+    selectedMethod?.id === "pix"
+  ));
+
+  const handlePollingSuccess = useCallback(() => {
+    setStep("success");
+  }, []);
+
+  const handlePollingExpired = useCallback(() => {
+    setStep("expired");
+  }, []);
+
+  usePolling({
+    sessionId: params?.sessionId || "",
+    interval: 3000,
+    maxAttempts: 200,
+    onSuccess: handlePollingSuccess,
+    onExpired: handlePollingExpired,
+  });
 
   // ── Customer validity callback ──
   const handleCustomerValidityChange = useCallback(
@@ -311,7 +206,7 @@ function CheckoutPageInner() {
     []
   );
 
-  // ── Initiate payment (V3 contract: { sessionId, paymentMethod, customer }) ──
+  // ── Initiate payment ──
   const doInitiate = useCallback(
     async (methodId: string, phone?: string) => {
       if (!session) return;
@@ -329,18 +224,19 @@ function CheckoutPageInner() {
           },
         };
 
-        console.log("[checkout] Initiating payment (V3):", JSON.stringify(payload, null, 2));
         const result = await initiatePayment(payload);
-        console.log("[checkout] Initiate result:", JSON.stringify(result, null, 2));
-
-        // Map gateway → component rendering is done by the parent
         setInitiateResult(result);
+
+        // Set step based on method type
+        if (PHONE_METHODS.includes(methodId as PaymentMethodType)) {
+          setStep("awaiting");
+        }
+        // For card/pix/multibanco, stay in checkout step (gateway UI renders)
       } catch (err) {
         console.error("[checkout] Initiate error:", err);
         setInitiateError(
           err instanceof Error ? err.message : t("error.initiateFailed")
         );
-        // On error, allow re-selection
         setSelectedMethod(null);
       } finally {
         setInitiating(false);
@@ -349,7 +245,7 @@ function CheckoutPageInner() {
     [session, params.sessionId, customerData, t]
   );
 
-  // ── Handle payment method selection ──
+  // ── Handle method selection ──
   const handleSelectMethod = useCallback(
     (method: PaymentMethodOption) => {
       if (!customerValid) return;
@@ -359,20 +255,18 @@ function CheckoutPageInner() {
       setInitiateError(null);
       setPhoneSubmitted(false);
 
-      // Coming soon — just select visually, no action
       if (method.comingSoon) return;
 
-      // Instant methods: initiate immediately (card, pix, multibanco)
+      // Instant methods initiate immediately
       if (INSTANT_METHODS.includes(method.id)) {
         doInitiate(method.id);
       }
-      // Phone methods (MBWAY/Bizum): show phone input, wait for user submission
-      // No action here — PhonePayment component handles the submit
+      // Phone methods: show phone input (PhonePayment handles submit)
     },
     [customerValid, doInitiate]
   );
 
-  // ── Handle phone submission (for MBWAY/Bizum) ──
+  // ── Phone submission ──
   const handlePhoneSubmit = useCallback(
     (phone: string) => {
       if (!selectedMethod) return;
@@ -382,59 +276,75 @@ function CheckoutPageInner() {
     [selectedMethod, doInitiate]
   );
 
-  // ── Handle Multibanco close ──
-  const handleCloseMultibanco = useCallback(() => {
+  // ── Reset to method selection ──
+  const handleReset = useCallback(() => {
     setSelectedMethod(null);
     setInitiateResult(null);
+    setInitiateError(null);
     setPhoneSubmitted(false);
+    setStep("checkout");
   }, []);
 
-  // ── Derived state ──
+  // ── Session expire ──
+  const handleSessionExpire = useCallback(() => {
+    setStep("expired");
+  }, []);
+
+  // ── Multibanco close ──
+  const handleCloseMultibanco = useCallback(() => {
+    handleReset();
+  }, [handleReset]);
+
+  // ── Derived values ──
   const brandColor = session?.primaryColor || "#111111";
   const isLocked = initiating || !!initiateResult || phoneSubmitted;
   const amountStr = session ? formatCurrency(session.amount, session.currency) : "";
 
-  // Extract checkoutData from the normalised initiate result
   const checkoutData: CheckoutData | null = initiateResult?.checkoutData ?? null;
+  const stripeData = checkoutData && isStripeCheckoutData(checkoutData) ? checkoutData : null;
+  const pixData = checkoutData && isPixCheckoutData(checkoutData) ? checkoutData : null;
+  const multibancoData = checkoutData && isMultibancoCheckoutData(checkoutData) ? checkoutData : null;
 
-  // Type-narrowed data for each gateway
-  const stripeData =
-    checkoutData && isStripeCheckoutData(checkoutData)
-      ? checkoutData
-      : null;
-  const pixData =
-    checkoutData && isPixCheckoutData(checkoutData)
-      ? checkoutData
-      : null;
-  const multibancoData =
-    checkoutData && isMultibancoCheckoutData(checkoutData)
-      ? checkoutData
-      : null;
-
-  // Stripe return URL
   const returnUrl = typeof window !== "undefined"
     ? `${window.location.origin}/pay/${params.sessionId}?status=success`
     : `/pay/${params.sessionId}?status=success`;
 
   // ── Render: Loading ──
-  if (loading) return <CheckoutSkeleton />;
+  if (step === "loading") return <CheckoutSkeleton />;
 
   // ── Render: Error ──
-  if (error || !session) {
+  if (step === "error" || !session) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <MinimalHeader />
         <main className="flex-1">
-          <ErrorScreen message={error || t("error.notFound")} />
+          <StatusScreen
+            step="error"
+            brandColor={brandColor}
+            errorMessage={error || t("error.notFound")}
+            onRetry={() => window.location.reload()}
+          />
         </main>
-        <CheckoutFooter />
+        <MinimalFooter />
+      </div>
+    );
+  }
+
+  // ── Render: Expired ──
+  if (step === "expired") {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <CheckoutHeader session={session} brandColor={brandColor} />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <StatusScreen step="expired" brandColor={brandColor} />
+        </main>
+        <MinimalFooter />
       </div>
     );
   }
 
   // ── Render: Success ──
-  if (paymentStatus === "success") {
-    // Redirect URL: session.returnUrl || metadata.returnUrl || query param
+  if (step === "success" || paymentStatus === "success") {
     const merchantReturnUrl =
       session.returnUrl ||
       session.metadata?.returnUrl ||
@@ -445,12 +355,32 @@ function CheckoutPageInner() {
       <div className="min-h-screen flex flex-col bg-background">
         <CheckoutHeader session={session} brandColor={brandColor} />
         <main className="flex-1 flex items-center justify-center px-4">
-          <SuccessScreen
+          <StatusScreen
+            step="success"
+            brandColor={brandColor}
             storeName={session.storeName}
             returnUrl={merchantReturnUrl}
           />
         </main>
-        <CheckoutFooter />
+        <MinimalFooter />
+      </div>
+    );
+  }
+
+  // ── Render: Processing / Awaiting (standalone status screens) ──
+  if (step === "processing" || step === "awaiting" || step === "cancelled") {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <CheckoutHeader session={session} brandColor={brandColor} />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <StatusScreen
+            step={step}
+            brandColor={brandColor}
+            storeName={session.storeName}
+            onRetry={handleReset}
+          />
+        </main>
+        <MinimalFooter />
       </div>
     );
   }
@@ -463,7 +393,11 @@ function CheckoutPageInner() {
       <main className="flex-1 px-4 py-5 sm:py-8">
         <div className="max-w-lg mx-auto w-full space-y-4">
           {/* ── Block A: Order Summary ── */}
-          <OrderBlock session={session} brandColor={brandColor} />
+          <OrderBlock
+            session={session}
+            brandColor={brandColor}
+            onExpire={handleSessionExpire}
+          />
 
           {/* ── Block B: Customer Identification ── */}
           <CustomerBlock
@@ -474,6 +408,7 @@ function CheckoutPageInner() {
           {/* ── Block C: Payment Wall ── */}
           <PaymentWall
             currency={session.currency}
+            countryCode={countryCode}
             enabled={customerValid}
             selectedMethod={selectedMethod?.id ?? null}
             locked={isLocked}
@@ -481,90 +416,139 @@ function CheckoutPageInner() {
             brandColor={brandColor}
           />
 
-          {/* ── Initiate Error (resilient — no crash) ── */}
-          {initiateError && (
-            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-              <p className="text-sm text-destructive">{initiateError}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-3 h-8 text-xs"
-                onClick={() => {
-                  setInitiateError(null);
-                  setSelectedMethod(null);
-                  setInitiateResult(null);
-                  setPhoneSubmitted(false);
-                }}
+          {/* ── Initiating state ── */}
+          <AnimatePresence>
+            {initiating && (
+              <motion.div
+                className="rounded-2xl border border-border/40 bg-card p-8 flex flex-col items-center justify-center space-y-3"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
               >
-                {t("error.tryAgain")}
-              </Button>
-            </div>
-          )}
+                <div
+                  className="h-10 w-10 rounded-full border-2 border-t-transparent animate-spin"
+                  style={{ borderColor: `${brandColor}40`, borderTopColor: "transparent" }}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t("initiate.processing")}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* ── Initiating Spinner ── */}
-          {initiating && (
-            <div className="rounded-xl border border-border/50 bg-card p-8 flex flex-col items-center justify-center space-y-3">
-              <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                {t("initiate.processing")}
-              </p>
-            </div>
-          )}
+          {/* ── Initiate Error (resilient) ── */}
+          <AnimatePresence>
+            {initiateError && !initiating && (
+              <motion.div
+                className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+              >
+                <p className="text-sm text-destructive">{initiateError}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 h-8 text-xs gap-1.5"
+                  onClick={handleReset}
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  {t("error.tryAgain")}
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* ── Initiated View: Gateway-specific rendering based on response ── */}
+          {/* ── Gateway-specific rendering based on initiate response ── */}
 
-          {/* CARD → Stripe Payment Element (dynamic publicKey from providerAction) */}
-          {selectedMethod?.id === "card" && stripeData && !initiating && (
-            <CardPayment
-              clientSecret={stripeData.clientSecret}
-              publicKey={stripeData.publicKey}
-              returnUrl={returnUrl}
-              brandColor={brandColor}
-              amount={amountStr}
-            />
-          )}
+          <AnimatePresence>
+            {/* CARD → Payment Element (dynamic publicKey from providerAction) */}
+            {selectedMethod?.id === "card" && stripeData && !initiating && (
+              <motion.div
+                key="card-payment"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+              >
+                <CardPayment
+                  clientSecret={stripeData.clientSecret}
+                  publicKey={stripeData.publicKey}
+                  returnUrl={returnUrl}
+                  brandColor={brandColor}
+                  amount={amountStr}
+                />
+              </motion.div>
+            )}
 
-          {/* MBWAY / BIZUM → Phone input → Waiting state */}
-          {selectedMethod && PHONE_METHODS.includes(selectedMethod.id) && !initiating && (
-            <PhonePayment
-              method={selectedMethod.id}
-              brandColor={brandColor}
-              onSubmit={handlePhoneSubmit}
-              isSubmitting={false}
-              isWaiting={phoneSubmitted}
-            />
-          )}
+            {/* MBWAY / BIZUM → Phone input → Waiting state */}
+            {selectedMethod && PHONE_METHODS.includes(selectedMethod.id) && !initiating && (
+              <motion.div
+                key="phone-payment"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+              >
+                <PhonePayment
+                  method={selectedMethod.id}
+                  brandColor={brandColor}
+                  onSubmit={handlePhoneSubmit}
+                  isSubmitting={false}
+                  isWaiting={phoneSubmitted}
+                />
+              </motion.div>
+            )}
 
-          {/* PIX → QR Code + Copy/Paste */}
-          {selectedMethod?.id === "pix" && pixData && !initiating && (
-            <AsyncPayment
-              data={pixData}
-              session={session}
-              brandColor={brandColor}
-              variant="pix"
-            />
-          )}
+            {/* PIX → QR Code + Copy/Paste */}
+            {selectedMethod?.id === "pix" && pixData && !initiating && (
+              <motion.div
+                key="pix-payment"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+              >
+                <AsyncPayment
+                  data={pixData}
+                  session={session}
+                  brandColor={brandColor}
+                  variant="pix"
+                />
+              </motion.div>
+            )}
 
-          {/* MULTIBANCO → Entity + Reference + Close button */}
-          {selectedMethod?.id === "multibanco" && multibancoData && !initiating && (
-            <AsyncPayment
-              data={multibancoData}
-              session={session}
-              brandColor={brandColor}
-              variant="multibanco"
-              onClose={handleCloseMultibanco}
-            />
-          )}
+            {/* MULTIBANCO → Entity + Reference + Close */}
+            {selectedMethod?.id === "multibanco" && multibancoData && !initiating && (
+              <motion.div
+                key="multibanco-payment"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+              >
+                <AsyncPayment
+                  data={multibancoData}
+                  session={session}
+                  brandColor={brandColor}
+                  variant="multibanco"
+                  onClose={handleCloseMultibanco}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </main>
 
-      <CheckoutFooter />
+      <MinimalFooter />
     </div>
   );
 }
 
-// ── Exported Page with I18n Provider ──
+// ── Exported Page ──
 
 export default function CheckoutPage() {
   return (
@@ -580,24 +564,36 @@ export default function CheckoutPage() {
 
 function MinimalHeader() {
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
       <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-7 w-7 rounded-md bg-foreground flex items-center justify-center">
-            <span className="text-background font-bold text-xs">XP</span>
+          <div className="h-7 w-7 rounded-lg bg-foreground flex items-center justify-center">
+            <span className="text-background font-bold text-[10px] tracking-tight">XP</span>
           </div>
-          <span className="font-semibold text-sm text-foreground">XPayments</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <LanguageSelector />
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 ml-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
             <ShieldCheck className="h-3 w-3" />
-            <span className="hidden sm:inline">Secure</span>
+            <span className="hidden sm:inline">{t_global("header.secure")}</span>
           </div>
         </div>
       </div>
     </header>
   );
+}
+
+// Quick access to translation outside I18n context (for MinimalHeader)
+function t_global(key: string): string {
+  const map: Record<string, Record<string, string>> = {
+    "header.secure": { pt: "Checkout Seguro", en: "Secure Checkout", es: "Checkout Seguro", fr: "Paiement Sécurisé" },
+  };
+  try {
+    const lang = typeof navigator !== "undefined" ? navigator.language.split("-")[0] : "en";
+    return map[key]?.[lang] ?? map[key]?.en ?? key;
+  } catch {
+    return map[key]?.en ?? key;
+  }
 }
 
 function CheckoutHeader({
@@ -615,7 +611,7 @@ function CheckoutHeader({
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/40">
+    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
       <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5 min-w-0">
           {/* Close button */}
@@ -623,8 +619,8 @@ function CheckoutHeader({
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            className="h-8 w-8 p-0 mr-1 shrink-0 text-muted-foreground hover:text-foreground"
-            aria-label="Close"
+            className="h-8 w-8 p-0 mr-0.5 shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={t("header.close")}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -639,7 +635,7 @@ function CheckoutHeader({
           ) : (
             <div className="flex items-center gap-2 min-w-0">
               <div
-                className="h-7 w-7 rounded-md flex items-center justify-center text-white font-bold text-xs shrink-0"
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shrink-0"
                 style={{ backgroundColor: brandColor }}
               >
                 {session.storeName.slice(0, 2).toUpperCase()}
@@ -651,9 +647,9 @@ function CheckoutHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <LanguageSelector />
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 ml-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 shrink-0">
             <ShieldCheck className="h-3 w-3" />
             <span className="hidden sm:inline">{t("header.secure")}</span>
           </div>
@@ -663,15 +659,23 @@ function CheckoutHeader({
   );
 }
 
-function CheckoutFooter() {
+function MinimalFooter() {
   const { t } = useI18n();
 
+  const poweredBy = t("footer.poweredBy");
+  const xpayments = t("footer.xpayments");
+  const secure = t("footer.secure");
+
   return (
-    <div className="mt-auto flex items-center justify-center gap-1.5 pt-6 pb-3 text-[11px] text-muted-foreground/60">
-      <span>{t("footer.poweredBy")}</span>
-      <span className="font-semibold text-muted-foreground">
-        {t("footer.xpayments")}
-      </span>
+    <div className="mt-auto flex items-center justify-center gap-1.5 pt-6 pb-3 text-[11px] text-muted-foreground/40">
+      {poweredBy && xpayments ? (
+        <>
+          <span>{poweredBy}</span>
+          <span className="font-semibold text-muted-foreground/50">{xpayments}</span>
+        </>
+      ) : (
+        <span>{secure}</span>
+      )}
     </div>
   );
 }
