@@ -1,180 +1,38 @@
 ---
 Task ID: 1
 Agent: main
-Task: Verify and complete architectural refactoring of checkout.xpayments.digital
+Task: Premium checkout redesign V3.1 — cards, icons, responsive, SEO, README, GitHub
 
 Work Log:
-- Verified project state: prisma/, src/app/api/, src/lib/db.ts, db/ already deleted (previous session)
-- Verified src/lib/api-client.ts exists with correct fetchPaymentLink + initiateCheckout
-- Verified src/app/pay/[urlCode]/page.tsx uses api-client imports (dumb frontend pattern)
-- Verified StripePaymentForm.tsx uses NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-- Updated .env: replaced DATABASE_URL with NEXT_PUBLIC_MASTER_API + NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-- Created .env.example with same vars for developer reference
-- Fixed .gitignore: added !.env.example exception to .env* pattern
-- Ran bun run lint — clean, zero errors
-- Committed: "chore: add .env.example, fix gitignore, sync lockfile"
-- Force pushed 3 commits to https://github.com/nexflowx-hub/checkout.xpayments.digital.git (main)
+- Analyzed current project state: PaymentWall, OrderBlock, CustomerBlock, checkout page, icons, metadata
+- Identified issues: MB WAY SVG was old red SIBS branding, Multibanco incorrectly used Mastercard icon, Visa/MC SVGs were single-color simplified versions
+- Copied uploaded logo_mbway.png and logo_multibanco.png to public/icons/
+- Created new full-color Visa SVG (dark blue card with white Visa wordmark)
+- Created new full-color Mastercard SVG (dark blue card with red/yellow overlapping circles)
+- Created new PIX SVG (teal background with white diamond pattern, proper brand mark)
+- Updated Bizum SVG with proper brand identity (blue icon + text)
+- Created generic card.svg fallback icon
+- Updated METHOD_VISUAL_MAP: mbway → .png, multibanco → .png, fallback → card.svg
+- Completely redesigned PaymentWall: section header pattern (icon + title + subtitle → divider → grid), premium card buttons with glass-morphism, selected state with brand-color dot indicator + left border accent, responsive grid (2-col on mobile, 3-col on sm+)
+- Redesigned OrderBlock: consistent section pattern, larger amount display (3xl/sm:2.5rem), currency badge, improved reference display
+- Redesigned CustomerBlock: uppercase tracking labels, rounded-xl inputs, improved icon sizing, premium validation states (emerald green)
+- Redesigned PhonePayment: premium section pattern with header, rounded-xl inputs, consistent styling
+- Redesigned AsyncPayment (PIX + Multibanco): improved QR shadow, better copy buttons, premium data cards
+- Updated CardPayment wrapper to match new card pattern
+- Updated checkout page: max-w-xl (was max-w-lg), improved spacing, better header/footer
+- Updated globals.css: improved dark mode colors, font features (cv11, ss01), selection styling, refined scrollbar
+- Updated layout.tsx: comprehensive SEO metadata (OG, Twitter Card, robots, authors, keywords, metadataBase, theme-color for light/dark, font preconnect)
+- Updated page.tsx: cleaner home page with badge, improved feature cards
+- Updated README.md: complete V3.1 documentation with dynamic payment methods, design system, responsive breakpoints, visual config map
+- Verified: lint clean, dev server starts in ~900ms, HTTP 200, full HTML renders, zero runtime errors
+- Pushed to GitHub: commit dfc6b33
 
 Stage Summary:
-- Project is a pure frontend client with zero backend logic
-- Only 2 env vars needed: NEXT_PUBLIC_MASTER_API, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-- All fetch calls go through src/lib/api-client.ts to Master Backend
-- GitHub repo is up-to-date with clean commit history
-
----
-Task ID: 2
-Agent: main
-Task: Fix dual gateway routing (MISTICPAY/PIX + Stripe), Stripe error boundary, mobile optimization, SEO
-
-Work Log:
-- Updated types/checkout.ts: added pixString field to PixCheckoutData, created getPixCode() helper (pixString || pixCode), isPixCheckoutData() type guard, isQrCodeImage() detector
-- Created src/components/checkout/StripeErrorBoundary.tsx: React class ErrorBoundary that catches Stripe Elements render crashes, shows "Aguardando configuração da Chave Stripe do Lojista" fallback
-- Rewrote src/app/pay/[urlCode]/page.tsx: replaced clientSecret-only state with full CheckoutResult {gateway, checkoutData}. Routes MISTICPAY → PixPaymentForm, STRIPE → StripePaymentForm. Added isPixGateway/isStripeGateway checks. Responsive breakpoints (sm:).
-- Updated StripePaymentForm.tsx: wrapped <Elements> in <StripeErrorBoundary>. Three-tier fallback: no key → setup notice, runtime crash → graceful amber alert, normal → PaymentElement.
-- Rewrote PixPaymentForm.tsx: supports MISTICPAY {qrCode, pixString} — if qrCode is URL/base64, renders <img>; otherwise generates QRCodeSVG from pixString. Removed "Simular Pagamento" demo button. Added expired-retry button.
-- Updated layout.tsx: Viewport export, favicon.svg (XP logo), lang=pt, themeColor, Open Graph pt_PT + alternates, Twitter card, robots config
-- Created public/favicon.svg: XP monogram on #111111 rounded rect
-- Updated public/robots.txt: simplified with sitemap reference
-- Mobile-first responsive: tighter px-3/p-4 on mobile, adaptive text sizes, truncated store names, hidden inline labels on small buttons
-- ESLint clean, committed, pushed to GitHub
-
-Stage Summary:
-- Dual gateway routing fully functional: MISTICPAY (PIX/BRL) and STRIPE (EUR/USD)
-- Stripe white-screen bug eliminated via ErrorBoundary
-- PixPaymentForm handles both MISTICPAY response format and legacy format
-- Mobile-optimized with responsive breakpoints throughout
-- Proper SEO: viewport, favicon, OG, Twitter, robots, lang attribute
-
----
-Task ID: 3
-Agent: main
-Task: Premium dark checkout refactoring — AZORES.BIO-inspired two-step flow
-
-Work Log:
-- Wrapped entire checkout in `className="dark"` to force dark CSS variables on all shadcn components
-- Background: #09090b (zinc-950), cards: CSS var --card (dark), borders: border-border/50
-- Backdrop-blur glass header with brand-colored logo initial
-- Two-step flow: Step 1 (Lead Capture) with split layout → Step 2 (Payment) with compact order bar
-- CustomerDetailsForm: added phone, address, postalCode, city fields; auto-detect country via navigator.language
-- OrderSummary: product image support, CompactOrderSummary for mobile inline + Step 2 bar
-- StripePaymentForm: Tabs with 'Cartão / Pagamento' (PaymentElement, night theme, brand color accents) + 'Web3 / Crypto' placeholder (Wallet icon, Metamask badge)
-- Stripe appearance: theme='night', custom rules for Label/Input/Tab, spacingBranding: 'none'
-- Stripe button shows amount: 'Pagar agora — €150.00'
-- PixPaymentForm: dark QR card with white bg + shadow, brand-colored amount badge
-- Home page: matching dark theme
-- Deleted stale PaymentTabs.tsx
-- ESLint clean, committed, pushed to GitHub
-
-Stage Summary:
-- Premium dark checkout fully implemented with AZORES.BIO design language
-- Two-step conversion-optimized flow: capture first, pay second
-- Stripe tabs with Web3 placeholder ready for future crypto integration
-- Expanded lead capture: 7 fields (3 required, 4 optional) with country auto-detect
-- All components defensively coded — no crashes on missing payload data---
-Task ID: 1
-Agent: Main Agent
-Task: Smart Drop-in / Dynamic Checkout — Single-screen refactoring
-
-Work Log:
-- Read all existing source files (types, api-client, xpApi, page, components, i18n)
-- Removed conflicting [urlCode] route that caused Next.js "different slug names" error
-- Updated src/types/checkout.ts: Added PaymentMethodType, PaymentMethodOption, SessionMetadata, MultibancoCheckoutData, PhoneCheckoutData, updated CheckoutData union, added gateway type guards, added getPaymentMethodsForCurrency(), added phone to CustomerPayload
-- Updated src/app/layout.tsx: Changed defaultTheme from "system" to "light"
-- Updated src/lib/i18n.tsx: Added 60+ new translation keys for single-screen checkout (3 locales: pt, en, es), removed old step-based keys, made useI18n resilient with FALLBACK_CONTEXT
-- Updated src/lib/api-client.ts: Added SessionMetadata handling in normalizeSession
-- Copied 6 payment method SVG icons to public/icons/ (visa, mastercard, mbway, bizum, pix, apple-pay)
-- Created src/components/checkout/OrderBlock.tsx (Block A: amount, currency, reference)
-- Created src/components/checkout/CustomerBlock.tsx (Block B: compact name+email with useMemo validation)
-- Created src/components/checkout/PaymentWall.tsx (Block C: currency-filtered method grid with disabled/selected states)
-- Created src/components/checkout/methods/CardPayment.tsx (Stripe Payment Element, no tabs)
-- Created src/components/checkout/methods/PhonePayment.tsx (MBWAY/Bizum phone input + "waiting for approval" state)
-- Created src/components/checkout/methods/AsyncPayment.tsx (PIX QR code + Multibanco entity/reference)
-- Rewrote src/app/pay/[sessionId]/page.tsx as single-screen Dynamic Checkout
-- Fixed SSR crash: window not defined → typeof window guard
-- Fixed SSR crash: useI18n outside I18nProvider → FALLBACK_CONTEXT pattern
-- Fixed ESLint: set-state-in-effect → useMemo for validation
-- Verified: lint clean, 200 response, correct SSR skeleton, correct client hydration
-
-Stage Summary:
-- Complete single-screen Dynamic Checkout implemented (no multi-step flow)
-- White-label theming: merchant controls dark mode via session.metadata.theme, no user toggle
-- Smart routing: EUR→Card/MBWAY/Bizum/Multibanco, BRL→PIX/Card, USD→Card/USDT(coming soon)
-- V3 API contract: initiatePayment({ sessionId, paymentMethod, customer: { name, email, phone? } })
-- Payment icons copied to public/icons/
-
----
-Task ID: 2
-Agent: main
-Task: Fix merchant-controlled theming, verify header logo, update README, push to GitHub
-
-Work Log:
-- Fixed layout.tsx: changed `enableSystem` from `true` to `false` — prevents OS dark mode from overriding merchant theme
-- Fixed page.tsx theme effect: now explicitly resets to "light" when no dark preference exists (prevents theme persistence between sessions)
-- Dark mode only activates on: (1) `session.metadata.theme === 'dark'` from API, or (2) `?theme=dark` URL param
-- Verified CheckoutHeader already correctly handles: `session.logoUrl` → `<img>`, fallback → colored initials + storeName text
-- Wrote comprehensive V3 technical README (~300 lines) covering: architecture, V3 API contract, smart routing, per-method behavior, theming rules, header branding, PostMessage API, i18n, TypeScript types, Stripe integration, deployment, security
-- ESLint clean, committed, pushed to GitHub (main)
-
-Stage Summary:
-- `enableSystem={false}` ensures theme is 100% merchant-controlled
-- Explicit `setTheme("light")` reset prevents dark theme leaking between sessions
-- Header logo: API-driven `logoUrl` with storeName text fallback (already working)
-- README fully rewritten for V3 Smart Drop-in architecture
-
----
-Task ID: 3
-Agent: main
-Task: V3 Smart Drop-in implementation — providerAction parsing, phone validation, success redirect
-
-Work Log:
-- Updated types/checkout.ts: Added NormalisedInitiateResult, updated InitiateCheckoutResponse with providerAction wrapper, added returnUrl to CheckoutSession, added validatePhoneForMethod() with PHONE_COUNTRY_PREFIXES config
-- Updated api-client.ts: initiatePayment() now extracts from data.providerAction.checkoutData (V3) with backwards-compat for direct data.checkoutData. Returns NormalisedInitiateResult { gateway, checkoutData }. normalizeSession() handles returnUrl from top-level or metadata.
-- Updated PhonePayment.tsx: Uses validatePhoneForMethod() for country-specific phone validation (PT/+351 for MBWAY, ES/+34 for Bizum). Method-specific placeholder text.
-- Updated AsyncPayment.tsx: MultibancoDisplay now has 'Fechar Checkout' button that sends XPAYMENTS_STATUS: CLOSED via PostMessage and resets page state via onClose prop.
-- Rewrote page.tsx: SuccessScreen with 3-second countdown + auto-redirect to merchant returnUrl (sourced from session.returnUrl > metadata.returnUrl > ?return_url param). Uses NormalisedInitiateResult instead of CheckoutResult. Added initiate.processing i18n key for spinner.
-- Updated i18n.tsx: Added 6 new keys across 3 locales (phone.countryMismatch, multibanco.close, initiate.processing, error.tryAgain, success.redirecting, success.returnToMerchant)
-- Updated xpApi.ts: Re-exports NormalisedInitiateResult type
-- ESLint clean, committed, pushed to GitHub (main)
-
-Stage Summary:
-- V3 providerAction parsing: frontend correctly extracts gateway + checkoutData from data.providerAction.checkoutData
-- Phone validation: MBWAY requires PT (+351), BIZUM requires ES (+34) with graceful fallback for local-format numbers
-- Multibanco: close button sends PostMessage CLOSED and resets checkout state
-- Success screen: 3-second countdown → auto-redirect to merchant URL (or close window)
-- All states (SUCCESS, CLOSED, CANCELLED) properly communicated via PostMessage API
----
-Task ID: 1
-Agent: Main Agent
-Task: Smart Drop-in V3 — Full implementation of premium universal checkout
-
-Work Log:
-- Analyzed entire existing codebase (14 active components, types, API client, i18n with 3 locales)
-- Rewrote src/types/checkout.ts: Added geolocation-based method filtering (COUNTRY_METHOD_PRIORITY), CheckoutStep type, LANG_TO_COUNTRY detection, PHONE_METHODS/INSTANT_METHODS constants, formatCountdown helper, PixCheckoutData.copyPaste/expiration fields, Apple Pay/Google Pay method stubs
-- Expanded src/lib/i18n.tsx: Added French (fr) locale, 80+ new translation keys for status screens/expired/white-label, removed all "Stripe" visible text, empty footer.poweredBy/footer.xpayments (white-label), added countryCode to I18nContext, changed default fallback from pt to en
-- Created src/hooks/use-country.ts: Browser locale-based country detection hook with useMemo
-- Created src/hooks/use-polling.ts: Payment status polling hook (3s interval, 200 max attempts, success/expired/error callbacks)
-- Created src/components/checkout/StatusScreen.tsx: Full status screen system (Processing with animated dots, Awaiting with pulsing rings, Expired with retry, Error with retry, Success with checkmark animation + progress bar + countdown redirect), all using framer-motion
-- Created src/components/checkout/CountdownTimer.tsx: Reusable countdown component (target date or duration, render prop pattern, expire callback, pause support) + CountdownBadge variant
-- Rewrote src/app/pay/[sessionId]/page.tsx: Complete V3 with CheckoutStep state machine (loading→checkout→processing→awaiting→success/error/expired/cancelled), geolocation-based PaymentWall, session expiration timer, polling integration for phone+PIX methods, AnimatePresence transitions, white-label header/footer
-- Polished src/components/checkout/OrderBlock.tsx: Fixed bug (was showing "Total a Pagar" instead of secure badge), added session countdown timer, framer-motion entrance animation, rounded-2xl design, description display
-- Rewrote src/components/checkout/PaymentWall.tsx: Geolocation-based filtering via useCountry, card gets full-width with dual brand icons (Visa+Mastercard), other methods in 2-col grid, spring-animated selection indicator, card brands note
-- Rewrote src/components/checkout/methods/CardPayment.tsx: Changed layout from "tabs" to "accordion", removed ALL "Stripe" text, generic "Secure payment with end-to-end encryption", better color defaults (#111111 instead of indigo), rounded-xl button
-- Rewrote src/components/checkout/methods/PhonePayment.tsx: Framer-motion animations, locale-aware placeholder (es-ES for Bizum), pulsing ring animation for waiting state, indeterminate progress bar
-- Rewrote src/components/checkout/methods/AsyncPayment.tsx: Reusable CopyButton component, spring-animated check icon, PIX QR code with motion entrance, Multibanco with uppercase tracking-widest labels, amount copy button
-- Rewrote src/components/checkout/CustomerBlock.tsx: Added expandable optional fields (phone, company, address, city, postal code, country, VAT) with AnimatePresence height animation, country auto-detection, chevron toggle
-- Updated src/components/checkout/StripeErrorBoundary.tsx: White-label fallback text (no gateway names)
-- Updated src/app/globals.css: Custom scrollbar styling, CSS rule to hide Stripe "Powered by" branding, refined dark theme border opacity
-- Rewrote src/app/page.tsx: Professional XPayments landing with feature cards (Smart Routing, Multi-Country, White-Label)
-- Updated src/app/layout.tsx: Removed all "Stripe" and "MISTICPAY" from metadata, white-label title/description
-- All code passes ESLint with zero errors
-
-Stage Summary:
-- Full V3 Smart Drop-in checkout implemented with premium UX
-- Geolocation-based payment method filtering (PT→Card/MBWAY/Multibanco, ES→Card/Bizum, BR→PIX/Card, EU→Card only)
-- 4-language support (PT/EN/ES/FR) with auto-detection
-- White-label: zero gateway names visible to customers
-- Framer-motion animations throughout (page transitions, selection indicators, pulsing effects, success checkmark)
-- Session expiration countdown
-- Payment status polling for async methods
-- Expandable customer form with optional fields
-- Clean component architecture: components/checkout/, components/checkout/methods/, hooks/, types/
+- 21 files changed, 1020 insertions, 780 deletions
+- All payment method icons now correct: MB WAY (official PNG), Multibanco (official PNG), Visa (full-color SVG), Mastercard (full-color SVG), PIX (teal brand SVG), Bizum (brand SVG)
+- Payment method cards redesigned with premium glass-morphism styling
+- All checkout blocks follow consistent section pattern (header → divider → content)
+- Fully responsive across mobile/tablet/desktop
+- Professional SEO metadata with OG, Twitter Card, robots
+- README updated with complete V3.1 technical documentation
+- GitHub updated successfully
