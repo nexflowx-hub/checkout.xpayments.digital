@@ -222,11 +222,6 @@ function MethodButton({
         >
           {displayLabel}
         </span>
-        {!isWide && (
-          <span className="block text-[10px] text-muted-foreground/50 mt-0.5 leading-none">
-            {method.provider || ""}
-          </span>
-        )}
       </div>
 
       {/* Selected indicator dot */}
