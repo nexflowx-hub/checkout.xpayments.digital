@@ -6,12 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Phone, Loader2, CheckCircle2 } from "lucide-react";
-import type { PaymentMethodType } from "@/types/checkout";
-import { validatePhoneForMethod } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
 
 interface PhonePaymentProps {
-  method: PaymentMethodType;
+  method: string;
   brandColor: string;
   onSubmit: (phone: string) => void;
   isSubmitting: boolean;
@@ -35,9 +33,13 @@ export function PhonePayment({
   const [error, setError] = useState<string | null>(null);
 
   function validate(): boolean {
-    const errorKey = validatePhoneForMethod(phone, method);
-    if (errorKey) {
-      setError(t(errorKey));
+    const cleaned = phone.replace(/[\s\-()]/g, "").trim();
+    if (!cleaned) {
+      setError(t("phone.required"));
+      return false;
+    }
+    if (!/^\+?\d{7,15}$/.test(cleaned)) {
+      setError(t("phone.invalid"));
       return false;
     }
     setError(null);
@@ -51,9 +53,10 @@ export function PhonePayment({
   }
 
   // Use locale-specific placeholder for bizum in Spanish
-  const placeholder = method === "bizum" && locale === "es"
+  const isBizum = method.toLowerCase() === "bizum";
+  const placeholder = isBizum && locale === "es"
     ? t("phone.placeholder.es")
-    : (METHOD_PLACEHOLDERS[method] ?? t("phone.placeholder"));
+    : (METHOD_PLACEHOLDERS[method.toLowerCase()] ?? t("phone.placeholder"));
 
   // Waiting for approval state
   if (isWaiting) {

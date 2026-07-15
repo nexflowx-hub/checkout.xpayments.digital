@@ -8,6 +8,14 @@ export interface SessionMetadata {
   [key: string]: unknown;
 }
 
+// ── API Payment Method (dynamic, from backend) ──
+
+export interface ApiPaymentMethod {
+  code: string;
+  label: string;
+  provider?: string;
+}
+
 export interface CheckoutSession {
   sessionId: string;
   storeName: string;
@@ -25,6 +33,8 @@ export interface CheckoutSession {
   returnUrl?: string;
   // Session expiration
   expiresAt?: string;
+  // Dynamic payment methods returned by the API
+  paymentMethods?: ApiPaymentMethod[];
 }
 
 // ── Checkout Flow Steps ──
@@ -421,3 +431,56 @@ export const PHONE_METHODS: PaymentMethodType[] = ["mbway", "bizum"];
 
 /** Methods that initiate immediately on click */
 export const INSTANT_METHODS: PaymentMethodType[] = ["card", "pix", "multibanco"];
+
+// ── String-based method classification (works with any code from API) ──
+
+const PHONE_METHOD_CODES = new Set(["mbway", "bizum", "mb_way", "MB_WAY"]);
+const INSTANT_METHOD_CODES = new Set(["card", "pix", "multibanco"]);
+
+/** Check if a method code (from API) requires phone input */
+export function isPhoneMethodCode(code: string): boolean {
+  const normalized = code.toLowerCase().replace(/-/g, "_");
+  return PHONE_METHOD_CODES.has(code.toLowerCase()) || PHONE_METHOD_CODES.has(normalized);
+}
+
+/** Check if a method code (from API) initiates immediately on click */
+export function isInstantMethodCode(code: string): boolean {
+  return INSTANT_METHOD_CODES.has(code.toLowerCase());
+}
+
+// ── Visual config map for known method codes ──
+
+export interface MethodVisualConfig {
+  labelKey: string;
+  icon: string;
+  iconSecondary?: string;
+  isCard?: boolean;
+}
+
+export const METHOD_VISUAL_MAP: Record<string, MethodVisualConfig> = {
+  card: { labelKey: "method.card", icon: "/icons/visa.svg", iconSecondary: "/icons/mastercard.svg", isCard: true },
+  mbway: { labelKey: "method.mbway", icon: "/icons/mbway.svg" },
+  mb_way: { labelKey: "method.mbway", icon: "/icons/mbway.svg" },
+  bizum: { labelKey: "method.bizum", icon: "/icons/bizum.svg" },
+  multibanco: { labelKey: "method.multibanco", icon: "/icons/mastercard.svg" },
+  pix: { labelKey: "method.pix", icon: "/icons/pix.svg" },
+  usdt: { labelKey: "method.usdt", icon: "/icons/apple-pay.svg" },
+  apple_pay: { labelKey: "method.applePay", icon: "/icons/apple-pay.svg" },
+  google_pay: { labelKey: "method.googlePay", icon: "/icons/apple-pay.svg" },
+};
+
+/** Get visual config for a method code, with fallback */
+export function getMethodVisual(code: string): MethodVisualConfig & { resolvedLabel: string } {
+  const known = METHOD_VISUAL_MAP[code.toLowerCase()];
+  if (known) return { ...known, resolvedLabel: "" };
+  return {
+    labelKey: "",
+    icon: "/icons/visa.svg",
+    resolvedLabel: code.charAt(0).toUpperCase() + code.slice(1).replace(/_/g, " "),
+  };
+}
+
+/** Check if a method code is a card-type method */
+export function isCardMethodCode(code: string): boolean {
+  return code.toLowerCase() === "card";
+}

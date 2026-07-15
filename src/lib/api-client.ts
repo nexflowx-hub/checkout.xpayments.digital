@@ -4,6 +4,7 @@
 import type {
   CheckoutSession,
   SessionMetadata,
+  ApiPaymentMethod,
   InitiatePaymentRequest,
   CheckoutData,
   NormalisedInitiateResult,
@@ -46,6 +47,20 @@ function normalizeSession(
     if (!session.returnUrl && meta.returnUrl && meta.returnUrl !== "null") {
       session.returnUrl = meta.returnUrl as string;
     }
+  }
+
+  // Dynamic payment methods from API (V3 contract)
+  if (Array.isArray(raw.paymentMethods) && raw.paymentMethods.length > 0) {
+    session.paymentMethods = raw.paymentMethods
+      .filter((m: unknown) => m && typeof m === "object" && "code" in (m as Record<string, unknown>))
+      .map((m: unknown) => {
+        const obj = m as Record<string, unknown>;
+        return {
+          code: String(obj.code ?? ""),
+          label: String(obj.label ?? ""),
+          ...(obj.provider ? { provider: String(obj.provider) } : {}),
+        };
+      });
   }
 
   return session;

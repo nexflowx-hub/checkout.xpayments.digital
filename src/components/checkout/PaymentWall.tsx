@@ -1,42 +1,35 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { PaymentMethodType, PaymentMethodOption } from "@/types/checkout";
-import { getPaymentMethods } from "@/types/checkout";
+import type { ApiPaymentMethod } from "@/types/checkout";
+import { getMethodVisual, isCardMethodCode } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
 
 interface PaymentWallProps {
-  currency: string;
-  countryCode?: string;
+  /** Payment methods from the API — rendered dynamically via .map() */
+  paymentMethods: ApiPaymentMethod[];
   enabled: boolean;
-  selectedMethod: PaymentMethodType | null;
+  selectedMethodCode: string | null;
   locked: boolean;
-  onSelectMethod: (method: PaymentMethodOption) => void;
+  onSelectMethod: (method: ApiPaymentMethod) => void;
   brandColor: string;
 }
 
 export function PaymentWall({
-  currency,
-  countryCode,
+  paymentMethods,
   enabled,
-  selectedMethod,
+  selectedMethodCode,
   locked,
   onSelectMethod,
   brandColor,
 }: PaymentWallProps) {
   const { t } = useI18n();
 
-  const methods = useMemo(
-    () => getPaymentMethods(currency, countryCode),
-    [currency, countryCode]
-  );
-
-  // Separate "card" from other methods — card gets special treatment
-  const cardMethod = methods.find((m) => m.id === "card");
-  const otherMethods = methods.filter((m) => m.id !== "card");
+  // Separate card from other methods for layout (card = full width, others = 2-col grid)
+  const cardMethods = paymentMethods.filter((m) => isCardMethodCode(m.code));
+  const otherMethods = paymentMethods.filter((m) => !isCardMethodCode(m.code));
 
   return (
     <motion.div
@@ -69,30 +62,30 @@ export function PaymentWall({
         </motion.p>
       )}
 
-      {/* Payment Method Grid */}
+      {/* Payment Method Grid — fully dynamic from API */}
       <div className={`space-y-2.5 ${!enabled ? "opacity-40 pointer-events-none" : ""}`}>
-        {/* Card — full width with brand logos */}
-        {cardMethod && (
+        {/* Card methods — full width */}
+        {cardMethods.map((method) => (
           <MethodButton
-            key={cardMethod.id}
-            method={cardMethod}
-            isSelected={selectedMethod === cardMethod.id}
+            key={method.code}
+            method={method}
+            isSelected={selectedMethodCode === method.code}
             disabled={!enabled || locked}
             brandColor={brandColor}
             t={t}
-            onClick={() => onSelectMethod(cardMethod)}
+            onClick={() => onSelectMethod(method)}
             isWide
           />
-        )}
+        ))}
 
         {/* Other methods — 2-column grid */}
         {otherMethods.length > 0 && (
           <div className="grid grid-cols-2 gap-2.5">
             {otherMethods.map((method) => (
               <MethodButton
-                key={method.id}
+                key={method.code}
                 method={method}
-                isSelected={selectedMethod === method.id}
+                isSelected={selectedMethodCode === method.code}
                 disabled={!enabled || locked}
                 brandColor={brandColor}
                 t={t}
@@ -103,8 +96,8 @@ export function PaymentWall({
         )}
       </div>
 
-      {/* Card brands note */}
-      {cardMethod && enabled && (
+      {/* Card brands note — only if card is present */}
+      {cardMethods.length > 0 && enabled && (
         <p className="text-[11px] text-muted-foreground/60 text-center pt-1">
           {t("block.payment.cardBrands")}
         </p>
@@ -124,7 +117,7 @@ function MethodButton({
   onClick,
   isWide = false,
 }: {
-  method: PaymentMethodOption;
+  method: ApiPaymentMethod;
   isSelected: boolean;
   disabled: boolean;
   brandColor: string;
@@ -132,6 +125,12 @@ function MethodButton({
   onClick: () => void;
   isWide?: boolean;
 }) {
+  // Get visual config (icon, labelKey) from our local map; fallback to API label
+  const visual = getMethodVisual(method.code);
+  const displayLabel = visual.labelKey
+    ? t(visual.labelKey)
+    : (visual.resolvedLabel || method.label);
+
   return (
     <motion.button
       type="button"
@@ -150,24 +149,24 @@ function MethodButton({
         ${isWide ? "" : "flex-col items-center justify-center gap-2.5 text-center"}
       `}
       whileTap={disabled ? undefined : { scale: 0.97 }}
-      aria-label={t(method.labelKey)}
+      aria-label={displayLabel}
       aria-pressed={isSelected}
     >
-      {/* Icon (with optional secondary icon for card brands) */}
+      {/* Icon */}
       <div
         className={`flex items-center justify-center gap-1.5 rounded-lg transition-colors shrink-0 ${
           isSelected ? "bg-foreground/5" : "bg-muted/30"
         } ${isWide ? "h-10 w-10 sm:h-11 sm:w-11" : "h-10 w-10 sm:h-11 sm:w-11"}`}
       >
         <img
-          src={method.icon}
+          src={visual.icon}
           alt=""
           className={`object-contain ${isWide ? "h-5 sm:h-6" : "h-6 sm:h-7"}`}
           loading="lazy"
         />
-        {method.iconSecondary && (
+        {visual.iconSecondary && (
           <img
-            src={method.iconSecondary}
+            src={visual.iconSecondary}
             alt=""
             className={`object-contain ${isWide ? "h-5 sm:h-6" : "h-6 sm:h-7"}`}
             loading="lazy"
@@ -181,7 +180,7 @@ function MethodButton({
           disabled ? "text-muted-foreground" : "text-foreground"
         }`}
       >
-        {t(method.labelKey)}
+        {displayLabel}
       </span>
 
       {/* Selected indicator */}
@@ -207,16 +206,6 @@ function MethodButton({
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Coming Soon badge */}
-      {method.comingSoon && (
-        <Badge
-          variant="secondary"
-          className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0 h-4 font-medium"
-        >
-          {t("method.comingSoon")}
-        </Badge>
-      )}
     </motion.button>
   );
 }

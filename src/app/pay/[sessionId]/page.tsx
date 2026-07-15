@@ -20,13 +20,11 @@ import { AsyncPayment } from "@/components/checkout/methods/AsyncPayment";
 import { StatusScreen } from "@/components/checkout/StatusScreen";
 import { LanguageSelector } from "@/components/checkout/LanguageSelector";
 import { I18nProvider, useI18n } from "@/lib/i18n";
-import { useCountry } from "@/hooks/use-country";
 import { usePolling } from "@/hooks/use-polling";
 import { getSession, initiatePayment } from "@/lib/api-client";
 import type {
   CheckoutSession,
-  PaymentMethodOption,
-  PaymentMethodType,
+  ApiPaymentMethod,
   CheckoutData,
   NormalisedInitiateResult,
   StripeCheckoutData,
@@ -39,8 +37,9 @@ import {
   isStripeCheckoutData,
   isPixCheckoutData,
   isMultibancoCheckoutData,
-  PHONE_METHODS,
-  INSTANT_METHODS,
+  isPhoneMethodCode,
+  isInstantMethodCode,
+  isCardMethodCode,
 } from "@/types/checkout";
 
 // ── PostMessage helpers ──
@@ -126,7 +125,6 @@ function CheckoutPageInner() {
   const params = useParams<{ sessionId: string }>();
   const searchParams = useSearchParams();
   const paymentStatus = usePaymentStatus();
-  const countryCode = useCountry();
 
   // ── Step state ──
   const [step, setStep] = useState<CheckoutStep>("loading");
@@ -140,7 +138,7 @@ function CheckoutPageInner() {
   const [customerData, setCustomerData] = useState({ name: "", email: "" });
 
   // ── Payment state ──
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodOption | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<ApiPaymentMethod | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
   const [initiateResult, setInitiateResult] = useState<NormalisedInitiateResult | null>(null);
@@ -178,7 +176,7 @@ function CheckoutPageInner() {
 
   // ── Payment status polling (for phone methods + PIX) ──
   const isPollingTarget = step === "awaiting" || (step === "checkout" && initiateResult && (
-    selectedMethod?.id === "pix"
+    selectedMethod?.code?.toLowerCase() === "pix"
   ));
 
   const handlePollingSuccess = useCallback(() => {
@@ -228,7 +226,7 @@ function CheckoutPageInner() {
         setInitiateResult(result);
 
         // Set step based on method type
-        if (PHONE_METHODS.includes(methodId as PaymentMethodType)) {
+        if (isPhoneMethodCode(methodId)) {
           setStep("awaiting");
         }
         // For card/pix/multibanco, stay in checkout step (gateway UI renders)
@@ -247,7 +245,7 @@ function CheckoutPageInner() {
 
   // ── Handle method selection ──
   const handleSelectMethod = useCallback(
-    (method: PaymentMethodOption) => {
+    (method: ApiPaymentMethod) => {
       if (!customerValid) return;
 
       setSelectedMethod(method);
@@ -255,13 +253,9 @@ function CheckoutPageInner() {
       setInitiateError(null);
       setPhoneSubmitted(false);
 
-      if (method.comingSoon) return;
-
-      // Instant methods initiate immediately
-      if (INSTANT_METHODS.includes(method.id)) {
-        doInitiate(method.id);
+      if (isInstantMethodCode(method.code)) {
+        doInitiate(method.code);
       }
-      // Phone methods: show phone input (PhonePayment handles submit)
     },
     [customerValid, doInitiate]
   );
@@ -271,7 +265,7 @@ function CheckoutPageInner() {
     (phone: string) => {
       if (!selectedMethod) return;
       setPhoneSubmitted(true);
-      doInitiate(selectedMethod.id, phone);
+      doInitiate(selectedMethod.code, phone);
     },
     [selectedMethod, doInitiate]
   );
@@ -405,12 +399,11 @@ function CheckoutPageInner() {
             onValidityChange={handleCustomerValidityChange}
           />
 
-          {/* ── Block C: Payment Wall ── */}
+          {/* ── Block C: Payment Wall (dynamic from API) ── */}
           <PaymentWall
-            currency={session.currency}
-            countryCode={countryCode}
+            paymentMethods={session.paymentMethods ?? []}
             enabled={customerValid}
-            selectedMethod={selectedMethod?.id ?? null}
+            selectedMethodCode={selectedMethod?.code ?? null}
             locked={isLocked}
             onSelectMethod={handleSelectMethod}
             brandColor={brandColor}
@@ -466,7 +459,7 @@ function CheckoutPageInner() {
 
           <AnimatePresence>
             {/* CARD → Payment Element (dynamic publicKey from providerAction) */}
-            {selectedMethod?.id === "card" && stripeData && !initiating && (
+            {selectedMethod && isCardMethodCode(selectedMethod.code) && stripeData && !initiating && (
               <motion.div
                 key="card-payment"
                 initial={{ opacity: 0, y: 8 }}
@@ -485,7 +478,7 @@ function CheckoutPageInner() {
             )}
 
             {/* MBWAY / BIZUM → Phone input → Waiting state */}
-            {selectedMethod && PHONE_METHODS.includes(selectedMethod.id) && !initiating && (
+            {selectedMethod && isPhoneMethodCode(selectedMethod.code) && !initiating && (
               <motion.div
                 key="phone-payment"
                 initial={{ opacity: 0, y: 8 }}
@@ -494,7 +487,7 @@ function CheckoutPageInner() {
                 transition={{ duration: 0.25 }}
               >
                 <PhonePayment
-                  method={selectedMethod.id}
+                  method={selectedMethod.code}
                   brandColor={brandColor}
                   onSubmit={handlePhoneSubmit}
                   isSubmitting={false}
@@ -504,7 +497,7 @@ function CheckoutPageInner() {
             )}
 
             {/* PIX → QR Code + Copy/Paste */}
-            {selectedMethod?.id === "pix" && pixData && !initiating && (
+            {selectedMethod?.code?.toLowerCase() === "pix" && pixData && !initiating && (
               <motion.div
                 key="pix-payment"
                 initial={{ opacity: 0, y: 8 }}
@@ -522,7 +515,7 @@ function CheckoutPageInner() {
             )}
 
             {/* MULTIBANCO → Entity + Reference + Close */}
-            {selectedMethod?.id === "multibanco" && multibancoData && !initiating && (
+            {selectedMethod?.code?.toLowerCase() === "multibanco" && multibancoData && !initiating && (
               <motion.div
                 key="multibanco-payment"
                 initial={{ opacity: 0, y: 8 }}
