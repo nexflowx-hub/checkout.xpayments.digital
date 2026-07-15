@@ -195,11 +195,12 @@ export function CardPayment({
 
   return (
     <motion.div
-      className="rounded-2xl border border-foreground/[0.06] bg-muted/20 p-4 sm:p-5"
-      initial={{ opacity: 0, y: 6 }}
+      className="rounded-2xl border border-border/30 bg-card/80 backdrop-blur-sm overflow-hidden"
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.3 }}
     >
+      <div className="p-5 sm:p-6">
       <StripeErrorBoundary fallback={<CrashFallback />}>
         <Elements stripe={stripePromise} options={options}>
           <CheckoutForm
@@ -209,6 +210,7 @@ export function CardPayment({
           />
         </Elements>
       </StripeErrorBoundary>
+      </div>
     </motion.div>
   );
 }

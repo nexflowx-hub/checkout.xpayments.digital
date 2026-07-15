@@ -68,20 +68,20 @@ function CopyButton({
       type="button"
       variant="ghost"
       size="sm"
-      className="h-8 px-2.5 gap-1.5 text-xs shrink-0"
+      className="h-8 px-2.5 gap-1.5 text-xs shrink-0 rounded-lg"
       onClick={() => onCopy(value, field)}
     >
       {isCopied ? (
         <>
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 400 }}>
-            <Check className="h-3.5 w-3.5 text-green-500" />
+            <Check className="h-3.5 w-3.5 text-emerald-500" />
           </motion.div>
-          {label && <span className="text-green-500">{label}</span>}
+          {label && <span className="text-emerald-500">{label}</span>}
         </>
       ) : (
         <>
-          <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-          {label && <span className="text-muted-foreground">{label}</span>}
+          <Copy className="h-3.5 w-3.5 text-muted-foreground/60" />
+          {label && <span className="text-muted-foreground/60">{label}</span>}
         </>
       )}
     </Button>
@@ -139,7 +139,7 @@ function PixDisplay({
       <div className="flex flex-col items-center gap-4">
         <div className="relative">
           <motion.div
-            className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-lg dark:shadow-black/30"
+            className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)]"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 }}
@@ -166,7 +166,7 @@ function PixDisplay({
           <AnimatePresence>
             {isExpired && (
               <motion.div
-                className="absolute inset-0 bg-background/85 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-2"
+                className="absolute inset-0 bg-background/90 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-2"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -187,7 +187,7 @@ function PixDisplay({
               {t("pix.scanTitle")}
             </p>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground/60">
             {t("pix.scanSubtitle")}
           </p>
         </div>
@@ -197,10 +197,10 @@ function PixDisplay({
       <div className="flex items-center justify-center gap-3">
         {expiresAt && (
           <span
-            className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
               isExpired
-                ? "text-destructive border-destructive/30 bg-destructive/5"
-                : "text-muted-foreground border-border bg-muted/30"
+                ? "text-destructive border-destructive/20 bg-destructive/5"
+                : "text-muted-foreground border-border/40 bg-muted/30"
             }`}
           >
             <Clock className="inline h-3 w-3 mr-1" />
@@ -208,11 +208,11 @@ function PixDisplay({
           </span>
         )}
         <span
-          className="text-xs font-semibold px-2.5 py-1 rounded-full border"
+          className="text-[11px] font-semibold px-2.5 py-1 rounded-full border"
           style={{
-            backgroundColor: `${brandColor}10`,
+            backgroundColor: `${brandColor}0D`,
             color: brandColor,
-            borderColor: `${brandColor}20`,
+            borderColor: `${brandColor}18`,
           }}
         >
           {formatCurrency(session.amount, session.currency)}
@@ -228,13 +228,13 @@ function PixDisplay({
           transition={{ delay: 0.1 }}
         >
           <div className="flex items-center gap-2">
-            <Smartphone className="h-4 w-4 text-muted-foreground" />
+            <Smartphone className="h-4 w-4 text-muted-foreground/60" />
             <p className="text-sm font-medium text-foreground">
               {t("pix.copyTitle")}
             </p>
           </div>
           <div className="flex gap-2">
-            <div className="flex-1 bg-muted/30 border border-border/60 rounded-lg px-3 py-2.5 text-[11px] sm:text-xs text-muted-foreground font-mono truncate select-all min-w-0">
+            <div className="flex-1 bg-muted/20 border border-border/30 rounded-xl px-3.5 py-2.5 text-[11px] sm:text-xs text-muted-foreground font-mono truncate select-all min-w-0">
               {pixCode}
             </div>
             <CopyButton
@@ -261,9 +261,9 @@ function PixDisplay({
         </Button>
       )}
 
-      <div className="flex items-center justify-center gap-2 pt-1">
-        <Shield className="h-3 w-3 text-muted-foreground/50" />
-        <p className="text-[11px] text-muted-foreground/50">
+      <div className="flex items-center justify-center gap-1.5 pt-1">
+        <Shield className="h-3 w-3 text-muted-foreground/30" />
+        <p className="text-[10px] text-muted-foreground/30">
           {t("pix.autoRefresh")}
         </p>
       </div>
@@ -294,102 +294,61 @@ function MultibancoDisplay({
   return (
     <div className="space-y-5">
       <motion.div
-        className="flex flex-col items-center text-center gap-2"
+        className="flex flex-col items-center text-center gap-3"
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
       >
         <div
-          className="flex items-center justify-center h-12 w-12 rounded-xl"
-          style={{ backgroundColor: `${brandColor}10` }}
+          className="flex items-center justify-center h-12 w-12 rounded-2xl"
+          style={{ backgroundColor: `${brandColor}0D` }}
         >
           <Landmark className="h-6 w-6" style={{ color: brandColor }} />
         </div>
         <p className="text-sm font-semibold text-foreground">
           {t("multibanco.title")}
         </p>
+        <p className="text-[11px] text-muted-foreground/60">
+          {t("multibanco.hint")}
+        </p>
       </motion.div>
 
-      {/* Entity / Reference / Amount cards */}
+      {/* Entity / Reference / Amount */}
       <div className="space-y-2.5">
-        {/* Entity */}
-        <motion.div
-          className="flex items-center justify-between p-3.5 rounded-xl bg-muted/20 border border-border/40"
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-        >
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
-              {t("multibanco.entity")}
-            </p>
-            <p className="text-xl font-mono font-bold text-foreground mt-0.5 tracking-wide">
-              {data.entity}
-            </p>
-          </div>
-          <CopyButton
-            field="entity"
-            value={data.entity}
-            copiedField={copiedField}
-            onCopy={copy}
-          />
-        </motion.div>
-
-        {/* Reference */}
-        <motion.div
-          className="flex items-center justify-between p-3.5 rounded-xl bg-muted/20 border border-border/40"
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
-              {t("multibanco.reference")}
-            </p>
-            <p className="text-xl font-mono font-bold text-foreground mt-0.5 tracking-wide">
-              {data.reference}
-            </p>
-          </div>
-          <CopyButton
-            field="ref"
-            value={data.reference}
-            copiedField={copiedField}
-            onCopy={copy}
-          />
-        </motion.div>
-
-        {/* Amount */}
-        <motion.div
-          className="flex items-center justify-between p-3.5 rounded-xl bg-muted/20 border border-border/40"
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-        >
-          <div>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
-              {t("multibanco.amount")}
-            </p>
-            <p className="text-xl font-bold text-foreground mt-0.5">
-              {formatCurrency(data.amount, "EUR")}
-            </p>
-          </div>
-          <CopyButton
-            field="amount"
-            value={formatCurrency(data.amount, "EUR")}
-            copiedField={copiedField}
-            onCopy={copy}
-          />
-        </motion.div>
+        {[
+          { key: "entity", label: t("multibanco.entity"), value: data.entity, mono: true },
+          { key: "ref", label: t("multibanco.reference"), value: data.reference, mono: true },
+          { key: "amount", label: t("multibanco.amount"), value: formatCurrency(data.amount, "EUR"), mono: false },
+        ].map((item, i) => (
+          <motion.div
+            key={item.key}
+            className="flex items-center justify-between p-3.5 rounded-xl bg-muted/15 border border-border/25"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 * (i + 1) }}
+          >
+            <div className="min-w-0">
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-medium">
+                {item.label}
+              </p>
+              <p className={`text-lg sm:text-xl font-bold text-foreground mt-0.5 tracking-wide ${item.mono ? "font-mono" : ""}`}>
+                {item.value}
+              </p>
+            </div>
+            <CopyButton
+              field={item.key}
+              value={item.value}
+              copiedField={copiedField}
+              onCopy={copy}
+            />
+          </motion.div>
+        ))}
       </div>
-
-      <p className="text-xs text-muted-foreground/70 text-center">
-        {t("multibanco.hint")}
-      </p>
 
       {/* Close button */}
       <Button
         type="button"
         variant="outline"
-        className="w-full h-10 text-sm font-medium gap-2 rounded-xl"
+        className="w-full h-10 text-sm font-medium gap-2 rounded-xl border-border/30"
         onClick={handleClose}
       >
         <X className="h-4 w-4" />
@@ -418,24 +377,26 @@ export function AsyncPayment({
 }: AsyncPaymentProps) {
   return (
     <motion.div
-      className="rounded-2xl border border-foreground/[0.06] bg-muted/20 p-4 sm:p-5"
-      initial={{ opacity: 0, y: 6 }}
+      className="rounded-2xl border border-border/30 bg-card/80 backdrop-blur-sm overflow-hidden"
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.3 }}
     >
-      {variant === "pix" ? (
-        <PixDisplay
-          data={data as PixCheckoutData}
-          session={session}
-          brandColor={brandColor}
-        />
-      ) : (
-        <MultibancoDisplay
-          data={data as MultibancoCheckoutData}
-          brandColor={brandColor}
-          onClose={onClose ?? (() => {})}
-        />
-      )}
+      <div className="p-5 sm:p-6">
+        {variant === "pix" ? (
+          <PixDisplay
+            data={data as PixCheckoutData}
+            session={session}
+            brandColor={brandColor}
+          />
+        ) : (
+          <MultibancoDisplay
+            data={data as MultibancoCheckoutData}
+            brandColor={brandColor}
+            onClose={onClose ?? (() => {})}
+          />
+        )}
+      </div>
     </motion.div>
   );
 }

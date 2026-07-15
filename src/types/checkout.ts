@@ -98,7 +98,7 @@ export const PAYMENT_METHODS: PaymentMethodOption[] = [
   {
     id: "multibanco",
     labelKey: "method.multibanco",
-    icon: "/icons/mastercard.svg",
+    icon: "/icons/multibanco.png",
     currencies: ["EUR"],
     countries: ["PT"],
   },
@@ -459,10 +459,10 @@ export interface MethodVisualConfig {
 
 export const METHOD_VISUAL_MAP: Record<string, MethodVisualConfig> = {
   card: { labelKey: "method.card", icon: "/icons/visa.svg", iconSecondary: "/icons/mastercard.svg", isCard: true },
-  mbway: { labelKey: "method.mbway", icon: "/icons/mbway.svg" },
-  mb_way: { labelKey: "method.mbway", icon: "/icons/mbway.svg" },
+  mbway: { labelKey: "method.mbway", icon: "/icons/mbway.png" },
+  mb_way: { labelKey: "method.mbway", icon: "/icons/mbway.png" },
   bizum: { labelKey: "method.bizum", icon: "/icons/bizum.svg" },
-  multibanco: { labelKey: "method.multibanco", icon: "/icons/mastercard.svg" },
+  multibanco: { labelKey: "method.multibanco", icon: "/icons/multibanco.png" },
   pix: { labelKey: "method.pix", icon: "/icons/pix.svg" },
   usdt: { labelKey: "method.usdt", icon: "/icons/apple-pay.svg" },
   apple_pay: { labelKey: "method.applePay", icon: "/icons/apple-pay.svg" },
@@ -475,7 +475,7 @@ export function getMethodVisual(code: string): MethodVisualConfig & { resolvedLa
   if (known) return { ...known, resolvedLabel: "" };
   return {
     labelKey: "",
-    icon: "/icons/visa.svg",
+    icon: "/icons/card.svg",
     resolvedLabel: code.charAt(0).toUpperCase() + code.slice(1).replace(/_/g, " "),
   };
 }

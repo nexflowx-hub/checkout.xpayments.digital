@@ -67,47 +67,55 @@ function usePaymentStatus() {
 function CheckoutSkeleton() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Header skeleton */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Skeleton className="h-7 w-7 rounded-lg" />
+      <header className="sticky top-0 z-50 backdrop-blur-2xl bg-background/90 border-b border-border/20">
+        <div className="max-w-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded-lg" />
             <Skeleton className="h-4 w-28" />
           </div>
           <div className="flex items-center gap-2">
-            <Skeleton className="h-8 w-16 rounded-md" />
-            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-8 w-16 rounded-lg" />
           </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6 space-y-4">
+      <main className="flex-1 max-w-xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-8 space-y-4">
         {/* Block A skeleton */}
-        <div className="rounded-2xl border border-border/30 bg-card p-5 space-y-3">
-          <div className="flex items-center gap-2.5">
-            <Skeleton className="h-8 w-8 rounded-lg" />
+        <div className="rounded-2xl border border-border/20 bg-card/60 p-5 sm:p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-xl" />
             <Skeleton className="h-4 w-32" />
           </div>
-          <Skeleton className="h-14 w-48 mx-auto rounded-xl" />
-          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-16 w-48 mx-auto rounded-xl" />
+          <Skeleton className="h-3 w-24 mx-auto" />
         </div>
 
         {/* Block B skeleton */}
-        <div className="rounded-2xl border border-border/30 bg-card p-5 space-y-3">
-          <Skeleton className="h-4 w-36" />
-          <div className="grid grid-cols-2 gap-3">
-            <Skeleton className="h-11 w-full rounded-lg" />
-            <Skeleton className="h-11 w-full rounded-lg" />
+        <div className="rounded-2xl border border-border/20 bg-card/60 p-5 sm:p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-xl" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
           </div>
         </div>
 
         {/* Block C skeleton */}
-        <div className="rounded-2xl border border-border/30 bg-card p-5 space-y-3">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-24 w-full rounded-xl" />
-          <div className="grid grid-cols-2 gap-2.5">
-            <Skeleton className="h-24 w-full rounded-xl" />
-            <Skeleton className="h-24 w-full rounded-xl" />
+        <div className="rounded-2xl border border-border/20 bg-card/60 p-5 sm:p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-xl" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          </div>
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
           </div>
         </div>
       </main>
@@ -225,11 +233,9 @@ function CheckoutPageInner() {
         const result = await initiatePayment(payload);
         setInitiateResult(result);
 
-        // Set step based on method type
         if (isPhoneMethodCode(methodId)) {
           setStep("awaiting");
         }
-        // For card/pix/multibanco, stay in checkout step (gateway UI renders)
       } catch (err) {
         console.error("[checkout] Initiate error:", err);
         setInitiateError(
@@ -361,7 +367,7 @@ function CheckoutPageInner() {
     );
   }
 
-  // ── Render: Processing / Awaiting (standalone status screens) ──
+  // ── Render: Processing / Awaiting / Cancelled ──
   if (step === "processing" || step === "awaiting" || step === "cancelled") {
     return (
       <div className="min-h-screen flex flex-col bg-background">
@@ -384,8 +390,8 @@ function CheckoutPageInner() {
     <div className="min-h-screen flex flex-col bg-background">
       <CheckoutHeader session={session} brandColor={brandColor} />
 
-      <main className="flex-1 px-4 py-5 sm:py-8">
-        <div className="max-w-lg mx-auto w-full space-y-4">
+      <main className="flex-1 px-4 sm:px-6 py-5 sm:py-8">
+        <div className="max-w-xl mx-auto w-full space-y-4 sm:space-y-5">
           {/* ── Block A: Order Summary ── */}
           <OrderBlock
             session={session}
@@ -413,15 +419,15 @@ function CheckoutPageInner() {
           <AnimatePresence>
             {initiating && (
               <motion.div
-                className="rounded-2xl border border-border/40 bg-card p-8 flex flex-col items-center justify-center space-y-3"
-                initial={{ opacity: 0, y: 6 }}
+                className="rounded-2xl border border-border/20 bg-card/80 backdrop-blur-sm p-8 sm:p-10 flex flex-col items-center justify-center space-y-4"
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
               >
                 <div
                   className="h-10 w-10 rounded-full border-2 border-t-transparent animate-spin"
-                  style={{ borderColor: `${brandColor}40`, borderTopColor: "transparent" }}
+                  style={{ borderColor: `${brandColor}30`, borderTopColor: "transparent" }}
                 />
                 <p className="text-sm text-muted-foreground">
                   {t("initiate.processing")}
@@ -430,22 +436,22 @@ function CheckoutPageInner() {
             )}
           </AnimatePresence>
 
-          {/* ── Initiate Error (resilient) ── */}
+          {/* ── Initiate Error ── */}
           <AnimatePresence>
             {initiateError && !initiating && (
               <motion.div
-                className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4"
-                initial={{ opacity: 0, y: 6 }}
+                className="rounded-2xl border border-destructive/20 bg-destructive/[0.03] p-4 sm:p-5"
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
               >
                 <p className="text-sm text-destructive">{initiateError}</p>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="mt-3 h-8 text-xs gap-1.5"
+                  className="mt-3 h-9 text-xs gap-1.5 rounded-lg"
                   onClick={handleReset}
                 >
                   <RotateCcw className="h-3 w-3" />
@@ -458,14 +464,14 @@ function CheckoutPageInner() {
           {/* ── Gateway-specific rendering based on initiate response ── */}
 
           <AnimatePresence>
-            {/* CARD → Payment Element (dynamic publicKey from providerAction) */}
+            {/* CARD → Payment Element */}
             {selectedMethod && isCardMethodCode(selectedMethod.code) && stripeData && !initiating && (
               <motion.div
                 key="card-payment"
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
               >
                 <CardPayment
                   clientSecret={stripeData.clientSecret}
@@ -481,10 +487,10 @@ function CheckoutPageInner() {
             {selectedMethod && isPhoneMethodCode(selectedMethod.code) && !initiating && (
               <motion.div
                 key="phone-payment"
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
               >
                 <PhonePayment
                   method={selectedMethod.code}
@@ -500,10 +506,10 @@ function CheckoutPageInner() {
             {selectedMethod?.code?.toLowerCase() === "pix" && pixData && !initiating && (
               <motion.div
                 key="pix-payment"
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
               >
                 <AsyncPayment
                   data={pixData}
@@ -518,10 +524,10 @@ function CheckoutPageInner() {
             {selectedMethod?.code?.toLowerCase() === "multibanco" && multibancoData && !initiating && (
               <motion.div
                 key="multibanco-payment"
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.25 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
               >
                 <AsyncPayment
                   data={multibancoData}
@@ -557,16 +563,16 @@ export default function CheckoutPage() {
 
 function MinimalHeader() {
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
-      <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
+    <header className="sticky top-0 z-50 backdrop-blur-2xl bg-background/90 border-b border-border/20">
+      <div className="max-w-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-7 w-7 rounded-lg bg-foreground flex items-center justify-center">
+          <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center">
             <span className="text-background font-bold text-[10px] tracking-tight">XP</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <LanguageSelector />
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/50">
             <ShieldCheck className="h-3 w-3" />
             <span className="hidden sm:inline">{t_global("header.secure")}</span>
           </div>
@@ -576,7 +582,6 @@ function MinimalHeader() {
   );
 }
 
-// Quick access to translation outside I18n context (for MinimalHeader)
 function t_global(key: string): string {
   const map: Record<string, Record<string, string>> = {
     "header.secure": { pt: "Checkout Seguro", en: "Secure Checkout", es: "Checkout Seguro", fr: "Paiement Sécurisé" },
@@ -604,21 +609,19 @@ function CheckoutHeader({
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
-      <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Close button */}
+    <header className="sticky top-0 z-50 backdrop-blur-2xl bg-background/90 border-b border-border/20">
+      <div className="max-w-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            className="h-8 w-8 p-0 mr-0.5 shrink-0 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 p-0 shrink-0 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 rounded-lg"
             aria-label={t("header.close")}
           >
             <X className="h-4 w-4" />
           </Button>
 
-          {/* Logo or store name (white-label) */}
           {session.logoUrl ? (
             <img
               src={session.logoUrl}
@@ -626,9 +629,9 @@ function CheckoutHeader({
               className="h-7 w-auto max-w-[140px] object-contain"
             />
           ) : (
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div
-                className="h-7 w-7 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shrink-0"
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shrink-0 tracking-tight"
                 style={{ backgroundColor: brandColor }}
               >
                 {session.storeName.slice(0, 2).toUpperCase()}
@@ -642,8 +645,8 @@ function CheckoutHeader({
 
         <div className="flex items-center gap-2">
           <LanguageSelector />
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60 shrink-0">
-            <ShieldCheck className="h-3 w-3" />
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/50 shrink-0">
+            <ShieldCheck className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t("header.secure")}</span>
           </div>
         </div>
@@ -660,11 +663,11 @@ function MinimalFooter() {
   const secure = t("footer.secure");
 
   return (
-    <div className="mt-auto flex items-center justify-center gap-1.5 pt-6 pb-3 text-[11px] text-muted-foreground/40">
+    <div className="mt-auto flex items-center justify-center gap-1.5 pt-6 pb-4 sm:pb-5 text-[11px] text-muted-foreground/30">
       {poweredBy && xpayments ? (
         <>
           <span>{poweredBy}</span>
-          <span className="font-semibold text-muted-foreground/50">{xpayments}</span>
+          <span className="font-semibold text-muted-foreground/40">{xpayments}</span>
         </>
       ) : (
         <span>{secure}</span>
