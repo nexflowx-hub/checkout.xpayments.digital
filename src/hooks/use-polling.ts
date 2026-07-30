@@ -6,6 +6,8 @@ const API_URL = process.env.NEXT_PUBLIC_MASTER_API || "https://api.xpayments.dig
 
 interface UsePollingOptions {
   sessionId: string;
+  /** Whether polling is active for the current checkout step */
+  enabled?: boolean;
   /** How often to poll (ms) */
   interval?: number;
   /** Max number of polls before stopping */
@@ -30,6 +32,7 @@ interface UsePollingReturn {
  */
 export function usePolling({
   sessionId,
+  enabled = false,
   interval = 3000,
   maxAttempts = 100,
   onSuccess,
@@ -51,7 +54,12 @@ export function usePolling({
   }, []);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!enabled || !sessionId) {
+      stopPolling();
+      setAttempts(0);
+      return;
+    }
+
     stoppedRef.current = false;
     setIsPolling(true);
     setAttempts(0);
@@ -84,22 +92,21 @@ export function usePolling({
         const envelope = raw.data ?? raw;
 
         // Check session status
-        const status = envelope.status as string | undefined;
+        const status = String(envelope.status ?? "").toLowerCase();
 
-        if (status === "paid" || status === "completed" || status === "succeeded") {
+        if (["paid", "completed", "succeeded"].includes(status)) {
           stopPolling();
           onSuccess();
           return;
         }
 
-        if (status === "expired" || status === "cancelled" || status === "failed") {
+        if (["expired", "cancelled", "canceled", "failed"].includes(status)) {
           stopPolling();
           if (status === "expired") {
             onExpired?.();
           } else {
             onError?.(`Status: ${status}`);
           }
-          return;
         }
       } catch (err) {
         // Network error — keep polling, don't crash
@@ -108,15 +115,26 @@ export function usePolling({
     }
 
     // Initial poll
-    poll();
+    void poll();
 
     // Subsequent polls
-    intervalRef.current = setInterval(poll, interval);
+    intervalRef.current = setInterval(() => {
+      void poll();
+    }, interval);
 
     return () => {
       stopPolling();
     };
-  }, [sessionId, interval, maxAttempts, onSuccess, onError, onExpired, stopPolling]);
+  }, [
+    enabled,
+    sessionId,
+    interval,
+    maxAttempts,
+    onSuccess,
+    onError,
+    onExpired,
+    stopPolling,
+  ]);
 
   return { isPolling, attempts, stopPolling };
 }
