@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { User, Mail, Phone, MapPin, Building2, ChevronDown, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n, COUNTRIES } from "@/lib/i18n";
@@ -11,18 +10,24 @@ import { useCountry } from "@/hooks/use-country";
 
 interface CustomerBlockProps {
   brandColor: string;
+  initialName?: string;
+  initialEmail?: string;
   onValidityChange: (isValid: boolean, data: { name: string; email: string }) => void;
 }
 
-export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockProps) {
+export function CustomerBlock({
+  brandColor,
+  initialName = "",
+  initialEmail = "",
+  onValidityChange,
+}: CustomerBlockProps) {
   const { t, locale } = useI18n();
   const detectedCountry = useCountry();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showOptional, setShowOptional] = useState(false);
-  const prevValidRef = useRef(false);
 
   // Optional fields
   const [phone, setPhone] = useState("");
@@ -32,6 +37,14 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
   const [country, setCountry] = useState(detectedCountry);
   const [company, setCompany] = useState("");
   const [vatId, setVatId] = useState("");
+
+  useEffect(() => {
+    setName(initialName);
+  }, [initialName]);
+
+  useEffect(() => {
+    setEmail(initialEmail);
+  }, [initialEmail]);
 
   // Validate required fields only
   const errors = useMemo(() => {
@@ -55,10 +68,10 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
   const isValid = Object.keys(errors).length === 0;
 
   useEffect(() => {
-    if (isValid !== prevValidRef.current) {
-      prevValidRef.current = isValid;
-      onValidityChange(isValid, { name: name.trim(), email: email.trim() });
-    }
+    onValidityChange(isValid, {
+      name: name.trim(),
+      email: email.trim(),
+    });
   }, [isValid, name, email, onValidityChange]);
 
   const handleBlur = (field: string) => {
@@ -131,6 +144,7 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
               <Input
                 id="customer-name"
                 type="text"
+                autoComplete="name"
                 placeholder={t("block.customer.namePlaceholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -160,6 +174,7 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
               <Input
                 id="customer-email"
                 type="email"
+                autoComplete="email"
                 placeholder={t("block.customer.emailPlaceholder")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -218,6 +233,7 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
                       <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
                       <Input
                         type="tel"
+                        autoComplete="tel"
                         placeholder={t("block.customer.phonePlaceholder")}
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
@@ -234,6 +250,7 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
                       <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
                       <Input
                         type="text"
+                        autoComplete="organization"
                         placeholder={t("block.customer.companyPlaceholder")}
                         value={company}
                         onChange={(e) => setCompany(e.target.value)}
@@ -252,6 +269,7 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
                     <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
                     <Input
                       type="text"
+                      autoComplete="street-address"
                       placeholder={t("block.customer.addressPlaceholder")}
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
@@ -268,6 +286,7 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
                     </Label>
                     <Input
                       type="text"
+                      autoComplete="address-level2"
                       placeholder={t("block.customer.cityPlaceholder")}
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
@@ -281,6 +300,7 @@ export function CustomerBlock({ brandColor, onValidityChange }: CustomerBlockPro
                     </Label>
                     <Input
                       type="text"
+                      autoComplete="postal-code"
                       placeholder={t("block.customer.postalCodePlaceholder")}
                       value={postalCode}
                       onChange={(e) => setPostalCode(e.target.value)}
