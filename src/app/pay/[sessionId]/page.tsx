@@ -185,6 +185,20 @@ function CheckoutPageInner() {
       setInitiating(true);
       setInitiateError(null);
 
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[checkout] doInitiate", {
+          methodCode,
+          sessionId: params.sessionId,
+          currency: session.currency,
+          customer: {
+            name: customerData.name,
+            email: customerData.email,
+            document: customerData.document || "(none)",
+            phone: phone || "(none)",
+          },
+        });
+      }
+
       try {
         const result = await initiatePayment({
           sessionId: params.sessionId,

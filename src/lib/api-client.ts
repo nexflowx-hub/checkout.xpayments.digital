@@ -104,23 +104,48 @@ function normalizeSession(
 
 // ── Get Checkout Session ──
 
+// Simple UUID v4 format check (case-insensitive, with/without dashes)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getSession(
   sessionId: string
 ): Promise<CheckoutSession> {
   if (!sessionId) throw new Error("ID de sessão em falta.");
 
-  const res = await fetch(v1(`/checkout/session/${sessionId}`), {
+  // Validate sessionId is a UUID — the backend (Prisma) rejects non-UUID with HTTP 500
+  if (!UUID_RE.test(sessionId.trim())) {
+    console.error("[getSession] sessionId is not a valid UUID", { sessionId });
+    throw new Error("ID de sessão inválido. Verifique o link de pagamento.");
+  }
+
+  const url = v1(`/checkout/session/${sessionId}`);
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[getSession] → GET", url);
+  }
+
+  const res = await fetch(url, {
     cache: "no-store",
   });
 
   const raw = await res.json();
 
   if (!res.ok) {
+    console.error("[getSession] ← HTTP", res.status, { url, response: raw });
     throw new Error(raw.message || raw.error || `Erro ${res.status} na consulta da API`);
   }
 
   // Backend wraps under `data`
   const envelope = (raw.data ?? raw) as Record<string, unknown>;
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[getSession] session loaded:", {
+      sessionId: envelope.sessionId,
+      currency: envelope.currency,
+      amount: envelope.amount,
+      paymentMethods: envelope.paymentMethods,
+    });
+  }
 
   if (!envelope || !Number.isFinite(Number(envelope.amount))) {
     throw new Error("Payload recebido não possui as propriedades de valor esperadas.");
@@ -136,7 +161,28 @@ export async function initiatePayment(
 ): Promise<NormalisedInitiateResult> {
   if (!data.sessionId) throw new Error("ID de sessão em falta.");
 
-  const res = await fetch(v1("/checkout/initiate"), {
+  // Validate sessionId is a UUID — the backend (Prisma) rejects non-UUID with HTTP 400
+  if (!UUID_RE.test(data.sessionId.trim())) {
+    console.error(
+      "[initiatePayment] sessionId is not a valid UUID — backend will return 400",
+      { sessionId: data.sessionId }
+    );
+    throw new Error(
+      "ID de sessão inválido. A sessão deve ser um UUID válido (ex: 550e8400-e29b-41d4-a716-446655440000)."
+    );
+  }
+
+  const url = v1("/checkout/initiate");
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[initiatePayment] → POST", url, {
+      sessionId: data.sessionId,
+      paymentMethod: data.paymentMethod,
+      customer: data.customer,
+    });
+  }
+
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // NO Authorization header — V3 validates via sessionId only
@@ -146,6 +192,11 @@ export async function initiatePayment(
   const raw = await res.json();
 
   if (!res.ok) {
+    console.error("[initiatePayment] ← HTTP", res.status, {
+      url,
+      paymentMethod: data.paymentMethod,
+      response: raw,
+    });
     throw new Error(raw.message || raw.error || `Erro ${res.status} ao iniciar pagamento`);
   }
 
@@ -156,6 +207,7 @@ export async function initiatePayment(
   ) as CheckoutData | undefined;
 
   if (!gateway || !checkoutData) {
+    console.error("[initiatePayment] response missing gateway/checkoutData", raw);
     throw new Error(
       raw.message || raw.error || "Erro ao iniciar pagamento — resposta inválida do gateway."
     );
