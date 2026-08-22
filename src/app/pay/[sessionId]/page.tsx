@@ -98,7 +98,7 @@ function CheckoutPageInner() {
   const [error, setError] = useState<string | null>(null);
 
   const [customerValid, setCustomerValid] = useState(false);
-  const [customerData, setCustomerData] = useState({ name: "", email: "" });
+  const [customerData, setCustomerData] = useState({ name: "", email: "", document: "" });
 
   const [selectedMethod, setSelectedMethod] = useState<ApiPaymentMethod | null>(null);
   const [initiating, setInitiating] = useState(false);
@@ -149,7 +149,8 @@ function CheckoutPageInner() {
 
   const pollingEnabled =
     step === "awaiting" ||
-    step === "processing";
+    step === "processing" ||
+    (selectedMethod?.code?.toLowerCase() === "pix" && Boolean(initiateResult));
 
   usePolling({
     sessionId: params?.sessionId || "",
@@ -166,9 +167,13 @@ function CheckoutPageInner() {
   });
 
   const handleCustomerValidityChange = useCallback(
-    (isValid: boolean, data: { name: string; email: string }) => {
+    (isValid: boolean, data: { name: string; email: string; document?: string }) => {
       setCustomerValid(isValid);
-      setCustomerData(data);
+      setCustomerData((prev) => ({
+        name: data.name,
+        email: data.email,
+        document: data.document ?? "",
+      }));
     },
     []
   );
@@ -187,6 +192,9 @@ function CheckoutPageInner() {
           customer: {
             name: customerData.name,
             email: customerData.email,
+            ...(customerData.document
+              ? { document: customerData.document }
+              : {}),
             ...(phone ? { phone } : {}),
           },
         });
@@ -347,6 +355,12 @@ function CheckoutPageInner() {
             brandColor={brandColor}
             initialName={initialName}
             initialEmail={initialEmail}
+            requireDocument={
+              session.currency.toUpperCase() === "BRL" &&
+              (session.paymentMethods ?? []).some(
+                (m) => m.code.toLowerCase() === "pix"
+              )
+            }
             onValidityChange={handleCustomerValidityChange}
           />
 

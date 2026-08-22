@@ -152,11 +152,6 @@ function MethodButton({
             : "border-border/30 bg-background hover:border-foreground/10 hover:bg-foreground/[0.02] hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] active:scale-[0.98]"
         }
       `}
-      style={
-        isSelected && !disabled
-          ? { focusVisibleRingColor: brandColor }
-          : undefined
-      }
       whileTap={disabled ? undefined : { scale: 0.98 }}
       aria-label={displayLabel}
       aria-pressed={isSelected}

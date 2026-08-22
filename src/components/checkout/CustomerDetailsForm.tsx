@@ -12,8 +12,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, ArrowRight, User, Mail, Phone, MapPin, Home } from "lucide-react";
-import type { CustomerDetails } from "@/types/checkout";
 import { useI18n, COUNTRIES, detectCountryCode } from "@/lib/i18n";
+
+/** Local customer details shape used by this legacy form (not exported from types) */
+interface CustomerDetails {
+  fullName: string;
+  email: string;
+  phone?: string;
+  country?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+}
 
 interface CustomerDetailsFormProps {
   onSubmit: (details: CustomerDetails) => Promise<void>;

@@ -36,3 +36,40 @@ Stage Summary:
 - Professional SEO metadata with OG, Twitter Card, robots
 - README updated with complete V3.1 technical documentation
 - GitHub updated successfully
+
+---
+Task ID: 2
+Agent: main
+Task: Integração PIX BRL real no checkout.xpayments.digital — CPF, polling, QR, abstração de provider
+
+Work Log:
+- Clonado o repo checkout.xpayments.digital e copiado para /home/z/my-project
+- Instaladas dependências em falta: @stripe/react-stripe-js, @stripe/stripe-js, qrcode.react, prisma, @prisma/client
+- Criado .env com NEXT_PUBLIC_MASTER_API=https://api.xpayments.digital e DATABASE_URL
+- src/types/checkout.ts: adicionado `document?: string` ao CustomerPayload; `providerTxId` tornado opcional em PixCheckoutData; ApiPaymentMethod.provider mantido opcional para backward compatibility; zero referências a MisticPay
+- src/lib/i18n.tsx: adicionadas 4 chaves de tradução (block.customer.document, documentPlaceholder, documentRequired, documentInvalid) em todos os 4 locales (pt, en, es, fr)
+- src/components/checkout/CustomerBlock.tsx: adicionada prop `requireDocument?: boolean`; quando true mostra campo CPF com máscara visual 000.000.000-00 (apenas dígitos, 11 obrigatórios); CPF obrigatório para isValid; onValidityChange agora retorna { name, email, document? }; comportamento inalterado quando requireDocument=false
+- src/app/pay/[sessionId]/page.tsx: customerData passa a incluir document; CustomerBlock recebe requireDocument={currency==="BRL" && paymentMethods contém pix}; initiatePayment envia customer.document condicionalmente; usePolling ativado também quando selectedMethod=pix && initiateResult (mantém QR visível, não troca para tela processing)
+- src/app/api/checkout/initiate/route.ts (mock): removidas todas as referências a MISTIC/MISTIC_BR_001 (substituídas por PIX_BR_001 neutro)
+- Corrigidos erros TypeScript pré-existentes: CountdownTimer (import useMemo), StatusScreen (ease as const), PaymentWall (removido focusVisibleRingColor inválido), PixPaymentForm (Date guard), CustomerDetailsForm (interface CustomerDetails local), AsyncPayment (Date guard)
+- tsconfig.json: excluídas pastas standalone (examples, skills, tests) que não fazem parte da app
+- Verificação E2E com Agent Browser + mocks locais temporários:
+  - Página checkout BRL renderiza campo CPF ✓
+  - Máscara CPF: "12345678900" → "123.456.789-00" ✓
+  - Métodos de pagamento ativam após form válido ✓
+  - Botão mostra apenas "PIX" (sem nome de provider) ✓
+  - Click PIX → initiate → QR code exibido (checkoutData.qrCode) ✓
+  - Código copia-e-cola exibido (getPixCode: pixString||pixCode||copyPaste) ✓
+  - Countdown timer 14:29 ✓
+  - Sem leak de provider/providerTxId/accountId ✓
+- Mocks temporários removidos; .env restaurado para https://api.xpayments.digital
+- Build final: ✓ Compiled successfully, lint clean, tsc --noEmit exit 0
+- Dev server iniciado, home page HTTP 200, zero erros de consola
+
+Stage Summary:
+- PIX BRL real integrado sem alterar fluxo Stripe/CardPayment/MB WAY/Bizum/Multibanco
+- CPF coletado e enviado ao backend apenas para BRL+PIX (requireDocument condicional)
+- Polling ativo durante exibição do QR (não troca para tela genérica processing)
+- Nome do provider real nunca exposto na UI (apenas "PIX")
+- Build, lint e TypeScript 100% limpos
+- Ficheiros alterados: src/types/checkout.ts, src/lib/i18n.tsx, src/components/checkout/CustomerBlock.tsx, src/app/pay/[sessionId]/page.tsx, src/app/api/checkout/initiate/route.ts, src/components/checkout/CountdownTimer.tsx, src/components/checkout/StatusScreen.tsx, src/components/checkout/PaymentWall.tsx, src/components/checkout/PixPaymentForm.tsx, src/components/checkout/CustomerDetailsForm.tsx, src/components/checkout/methods/AsyncPayment.tsx, tsconfig.json, package.json, .env

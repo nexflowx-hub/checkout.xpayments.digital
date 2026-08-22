@@ -217,6 +217,7 @@ export interface CustomerPayload {
   name: string;
   email: string;
   phone?: string;
+  document?: string;
 }
 
 export interface CustomerForm {
@@ -254,7 +255,7 @@ export interface PixCheckoutData {
   pixCode?: string;
   pixKey?: string;
   copyPaste?: string;
-  providerTxId: string;
+  providerTxId?: string;
   qrCode?: string;
   qrCodeBase64?: string;
   expiresAt?: string;

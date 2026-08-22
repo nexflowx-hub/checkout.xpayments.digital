@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 // Mock database of stores for demo purposes
 const STORE_GATEWAYS: Record<string, { gateway: string; currency: string }> = {
   store_pt_001: { gateway: "STRIPE_PT_002", currency: "EUR" },
-  store_br_001: { gateway: "MISTIC_BR_001", currency: "BRL" },
+  store_br_001: { gateway: "PIX_BR_001", currency: "BRL" },
 };
 
 export async function POST(request: NextRequest) {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // ── Mock response for demo ──
     const storeConfig = STORE_GATEWAYS[storeId];
-    const gateway = storeConfig?.gateway ?? (currency === "BRL" ? "MISTIC_BR_001" : "STRIPE_PT_002");
+    const gateway = storeConfig?.gateway ?? (currency === "BRL" ? "PIX_BR_001" : "STRIPE_PT_002");
 
     if (gateway.toUpperCase().includes("STRIPE")) {
       return NextResponse.json({
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // PIX / MISTIC mock
+    // PIX mock
     const pixCode =
       "00020126580014br.gov.bcb.pix0136a1b2c3d4-e5f6-7890-abcd-ef1234567890" +
       "5204000053039865802BR5925XPAYMENTS DIGITAL TECNOLOGIA LTDA6009SAO PAULO" +

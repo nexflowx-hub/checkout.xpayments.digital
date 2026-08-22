@@ -35,9 +35,10 @@ export function PixPaymentForm({
   // Countdown timer
   useEffect(() => {
     if (!expiresAt) return;
+    const target = expiresAt;
 
     function updateTimer() {
-      const diff = new Date(expiresAt).getTime() - Date.now();
+      const diff = new Date(target).getTime() - Date.now();
       if (diff <= 0) {
         setTimeLeft(t("pix.expired"));
         return;

@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Mail, Phone, MapPin, Building2, ChevronDown, CheckCircle2 } from "lucide-react";
+import { User, Mail, Phone, MapPin, Building2, ChevronDown, CheckCircle2, IdCard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useI18n, COUNTRIES } from "@/lib/i18n";
 import { useCountry } from "@/hooks/use-country";
@@ -12,13 +12,37 @@ interface CustomerBlockProps {
   brandColor: string;
   initialName?: string;
   initialEmail?: string;
-  onValidityChange: (isValid: boolean, data: { name: string; email: string }) => void;
+  requireDocument?: boolean;
+  onValidityChange: (isValid: boolean, data: { name: string; email: string; document?: string }) => void;
+}
+
+// ── CPF helpers ──
+
+/** Strip everything except digits */
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+/** Apply the visual mask 000.000.000-00 to a digit string (max 11 digits) */
+function maskCpf(digits: string): string {
+  const d = onlyDigits(digits).slice(0, 11);
+  const p1 = d.slice(0, 3);
+  const p2 = d.slice(3, 6);
+  const p3 = d.slice(6, 9);
+  const p4 = d.slice(9, 11);
+
+  let out = p1;
+  if (p2) out += `.${p2}`;
+  if (p3) out += `.${p3}`;
+  if (p4) out += `-${p4}`;
+  return out;
 }
 
 export function CustomerBlock({
   brandColor,
   initialName = "",
   initialEmail = "",
+  requireDocument = false,
   onValidityChange,
 }: CustomerBlockProps) {
   const { t, locale } = useI18n();
@@ -26,6 +50,7 @@ export function CustomerBlock({
 
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState(initialEmail);
+  const [document, setDocument] = useState("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showOptional, setShowOptional] = useState(false);
 
@@ -46,6 +71,13 @@ export function CustomerBlock({
     setEmail(initialEmail);
   }, [initialEmail]);
 
+  // Reset document when the requirement toggles off
+  useEffect(() => {
+    if (!requireDocument && document) {
+      setDocument("");
+    }
+  }, [requireDocument, document]);
+
   // Validate required fields only
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -62,20 +94,36 @@ export function CustomerBlock({
       e.email = t("block.customer.emailInvalid");
     }
 
+    // CPF (document) — only required when requireDocument is true
+    if (requireDocument) {
+      const digits = onlyDigits(document);
+      if (!digits) {
+        e.document = t("block.customer.documentRequired");
+      } else if (digits.length !== 11) {
+        e.document = t("block.customer.documentInvalid");
+      }
+    }
+
     return e;
-  }, [name, email, t]);
+  }, [name, email, document, requireDocument, t]);
 
   const isValid = Object.keys(errors).length === 0;
 
   useEffect(() => {
+    const digits = onlyDigits(document);
     onValidityChange(isValid, {
       name: name.trim(),
       email: email.trim(),
+      ...(requireDocument && digits ? { document: digits } : {}),
     });
-  }, [isValid, name, email, onValidityChange]);
+  }, [isValid, name, email, document, requireDocument, onValidityChange]);
 
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const handleDocumentChange = (value: string) => {
+    setDocument(maskCpf(value));
   };
 
   const countryList = COUNTRIES[locale] || COUNTRIES.en;
@@ -194,6 +242,40 @@ export function CustomerBlock({
             )}
           </div>
         </div>
+
+        {/* CPF / Document — only for BRL/PIX */}
+        {requireDocument && (
+          <div className="space-y-1.5">
+            <Label htmlFor="customer-document" className="text-[11px] font-medium text-muted-foreground/80 tracking-wide uppercase">
+              {t("block.customer.document")} <span className="text-destructive/80">*</span>
+            </Label>
+            <div className="relative">
+              <IdCard className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+              <Input
+                id="customer-document"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder={t("block.customer.documentPlaceholder")}
+                value={document}
+                onChange={(e) => handleDocumentChange(e.target.value)}
+                onBlur={() => handleBlur("document")}
+                className={`${inputClasses("document")} pl-10 font-mono tracking-wide`}
+                aria-invalid={touched.document && !!errors.document}
+                maxLength={14}
+              />
+            </div>
+            {touched.document && errors.document && (
+              <motion.p
+                className="text-[11px] text-destructive/80 pl-1"
+                initial={{ opacity: 0, y: -2 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {errors.document}
+              </motion.p>
+            )}
+          </div>
+        )}
 
         {/* Toggle optional fields */}
         <button
