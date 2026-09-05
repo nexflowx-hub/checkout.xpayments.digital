@@ -18,6 +18,11 @@ function optionalString(value: unknown): string | undefined {
   return trimmed && trimmed !== "null" ? trimmed : undefined;
 }
 
+function optionalNumber(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function normalizeSession(
   raw: Record<string, unknown>,
   fallbackId: string
@@ -59,19 +64,26 @@ function normalizeSession(
     metadata,
   };
 
+  const internalStoreName = optionalString(raw.internalStoreName);
   const reference = optionalString(raw.reference);
   const storeId = optionalString(raw.storeId);
   const logoUrl = optionalString(raw.logoUrl);
   const primaryColor = optionalString(raw.primaryColor);
   const returnUrl = optionalString(raw.returnUrl) ?? optionalString(metadata.returnUrl);
   const expiresAt = optionalString(raw.expiresAt) ?? optionalString(metadata.expiresAt);
+  const autoReturnSeconds =
+    optionalNumber(raw.autoReturnSeconds) ?? optionalNumber(metadata.autoReturnSeconds);
+  const localeMode = optionalString(raw.localeMode);
 
+  if (internalStoreName) session.internalStoreName = internalStoreName;
   if (reference) session.reference = reference;
   if (storeId) session.storeId = storeId;
   if (logoUrl) session.logoUrl = logoUrl;
   if (primaryColor) session.primaryColor = primaryColor;
   if (returnUrl) session.returnUrl = returnUrl;
   if (expiresAt) session.expiresAt = expiresAt;
+  if (autoReturnSeconds !== undefined) session.autoReturnSeconds = autoReturnSeconds;
+  if (localeMode) session.localeMode = localeMode;
 
   if (Array.isArray(raw.paymentMethods) && raw.paymentMethods.length > 0) {
     session.paymentMethods = raw.paymentMethods
