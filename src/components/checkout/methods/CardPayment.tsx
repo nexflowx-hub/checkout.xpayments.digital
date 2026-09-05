@@ -12,11 +12,11 @@ import { useTheme } from "next-themes";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
-  CreditCard,
   Loader2,
   LockKeyhole,
   ShieldCheck,
   Sparkles,
+  WalletCards,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StripeErrorBoundary } from "@/components/checkout/StripeErrorBoundary";
@@ -68,7 +68,7 @@ function CheckoutForm({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="rounded-[20px] border border-border/50 bg-background/70 p-3 sm:p-4">
+      <div className="rounded-[22px] border border-border/50 bg-background/75 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.7)] sm:p-4">
         <PaymentElement
           options={{
             layout: {
@@ -93,7 +93,7 @@ function CheckoutForm({
 
       <Button
         type="submit"
-        className="h-12 w-full gap-2 rounded-2xl text-sm font-semibold shadow-[0_14px_38px_-20px_rgba(0,0,0,.55)]"
+        className="h-12 w-full gap-2 rounded-2xl text-sm font-semibold shadow-[0_18px_44px_-24px_rgba(0,0,0,.65)]"
         style={brandColor ? { backgroundColor: brandColor, color: "#fff" } : undefined}
         disabled={!stripe || !elements || isLoading}
       >
@@ -124,12 +124,21 @@ function CheckoutForm({
   );
 }
 
+function BrandMark() {
+  return (
+    <div className="flex h-11 min-w-[86px] items-center justify-center gap-2 rounded-[17px] border border-border/50 bg-white px-3 shadow-[0_10px_28px_-20px_rgba(15,23,42,.75),inset_0_1px_0_#fff]">
+      <img src="/icons/visa.svg" alt="Visa" className="h-[14px] w-auto" draggable={false} />
+      <img src="/icons/mastercard.svg" alt="Mastercard" className="h-[27px] w-auto" draggable={false} />
+    </div>
+  );
+}
+
 function KeyMissing() {
   const { t } = useI18n();
   return (
     <div className="py-10 text-center">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-border/50 bg-muted/30">
-        <CreditCard className="h-6 w-6 text-muted-foreground" />
+        <WalletCards className="h-6 w-6 text-muted-foreground" />
       </div>
       <p className="mt-4 text-sm font-semibold text-foreground">{t("card.keyMissing")}</p>
       <p className="mt-1 text-xs text-muted-foreground">{t("card.keyMissingDesc")}</p>
@@ -185,7 +194,7 @@ export function CardPayment({
           colorTextSecondary: isDark ? "#a1a1aa" : "#71717a",
           colorDanger: "#ef4444",
           fontFamily: "var(--font-geist-sans), Inter, system-ui, sans-serif",
-          borderRadius: "14px",
+          borderRadius: "16px",
           spacingUnit: "4px",
           spacingBranding: "none",
         },
@@ -204,7 +213,7 @@ export function CardPayment({
             boxShadow: `0 0 0 1px ${brandColor || "#18181b"}`,
           },
           ".Tab": {
-            borderRadius: "14px",
+            borderRadius: "16px",
             borderColor: isDark ? "#27272a" : "#e4e4e7",
             boxShadow: "none",
           },
@@ -222,27 +231,29 @@ export function CardPayment({
 
   return (
     <motion.section
-      className="relative overflow-hidden rounded-[28px] border border-border/50 bg-card/90 shadow-[0_24px_70px_-42px_rgba(15,23,42,.6)] backdrop-blur-xl"
+      className="relative overflow-hidden rounded-[30px] border border-border/50 bg-card/95 shadow-[0_30px_88px_-48px_rgba(15,23,42,.68)] backdrop-blur-xl"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
       <div
-        className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full opacity-10 blur-3xl"
+        className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full opacity-[.12] blur-3xl"
         style={{ backgroundColor: brandColor || "#111111" }}
       />
+      <div className="pointer-events-none absolute inset-0 opacity-[.025] [background-image:linear-gradient(135deg,currentColor_1px,transparent_1px)] [background-size:12px_12px]" />
 
-      <div className="relative border-b border-border/40 px-5 py-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl border border-border/50 bg-background shadow-sm">
-            <CreditCard className="h-5 w-5 text-foreground" strokeWidth={1.7} />
+      <div className="relative border-b border-border/40 px-5 py-4 sm:px-6 sm:py-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <BrandMark />
+            <div>
+              <h3 className="text-sm font-semibold tracking-tight">Pagamento por cartão e wallets</h3>
+              <p className="mt-0.5 max-w-[310px] text-[10.5px] leading-4 text-muted-foreground">
+                O Stripe Payment Element apresenta apenas as opções elegíveis e configuradas para este pagamento.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight">Pagamento seguro</h3>
-            <p className="mt-0.5 text-[10.5px] text-muted-foreground">
-              Stripe apresenta os métodos disponíveis para este pagamento.
-            </p>
-          </div>
+          <ShieldCheck className="hidden h-5 w-5 text-muted-foreground/45 sm:block" />
         </div>
       </div>
 
