@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useParams, useSearchParams } from "next/navigation";
@@ -37,25 +38,25 @@ import {
   isInstantMethodCode,
   isMultibancoCheckoutData,
   isPhoneMethodCode,
-  isPixCheckoutData,
   isStripeCheckoutData,
 } from "@/types/checkout";
 
-function notifyParent(status: "SUCCESS" | "CLOSED" | "CANCELLED") {
-  if (typeof window !== "undefined" && window.parent !== window) {
-    window.parent.postMessage({ type: "XPAYMENTS_STATUS", status }, "*");
+function safeTargetOrigin(value: string | null): string {
+  if (!value) return "*";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "*";
   }
 }
 
-function usePaymentStatus() {
-  const searchParams = useSearchParams();
-
-  return useMemo<"success" | "cancelled" | null>(() => {
-    const status = searchParams.get("status");
-    if (status === "success") return "success";
-    if (status === "cancelled") return "cancelled";
-    return null;
-  }, [searchParams]);
+function postParent(
+  status: "SUCCESS" | "CLOSED" | "CANCELLED",
+  targetOrigin: string
+) {
+  if (typeof window !== "undefined" && window.parent !== window) {
+    window.parent.postMessage({ type: "XPAYMENTS_STATUS", status }, targetOrigin);
+  }
 }
 
 function CheckoutSkeleton() {
@@ -70,13 +71,9 @@ function CheckoutSkeleton() {
           <Skeleton className="h-8 w-16 rounded-lg" />
         </div>
       </header>
-
       <main className="flex-1 max-w-xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-8 space-y-4">
         {["order", "customer", "methods"].map((key) => (
-          <div
-            key={key}
-            className="rounded-2xl border border-border/20 bg-card/60 p-5 sm:p-6 space-y-4"
-          >
+          <div key={key} className="rounded-2xl border border-border/20 bg-card/60 p-5 sm:p-6 space-y-4">
             <Skeleton className="h-5 w-36" />
             <Skeleton className="h-14 w-full rounded-xl" />
           </div>
@@ -91,20 +88,27 @@ function CheckoutPageInner() {
   const { setTheme } = useTheme();
   const params = useParams<{ sessionId: string }>();
   const searchParams = useSearchParams();
-  const paymentStatus = usePaymentStatus();
+
+  const embedded = searchParams.get("embedded") === "1";
+  const returnedFromProvider =
+    searchParams.get("return") === "1" ||
+    searchParams.get("status") === "success";
+  const parentOrigin = useMemo(
+    () => safeTargetOrigin(searchParams.get("parent_origin")),
+    [searchParams]
+  );
 
   const [step, setStep] = useState<CheckoutStep>("loading");
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const [customerValid, setCustomerValid] = useState(false);
-  const [customerData, setCustomerData] = useState({ name: "", email: "", document: "" });
-
+  const [customerData, setCustomerData] = useState({ name: "", email: "" });
   const [selectedMethod, setSelectedMethod] = useState<ApiPaymentMethod | null>(null);
   const [initiating, setInitiating] = useState(false);
   const [initiateError, setInitiateError] = useState<string | null>(null);
   const [initiateResult, setInitiateResult] = useState<NormalisedInitiateResult | null>(null);
   const [phoneSubmitted, setPhoneSubmitted] = useState(false);
+  const successNotified = useRef(false);
 
   useEffect(() => {
     const forcedTheme = searchParams.get("theme");
@@ -120,12 +124,17 @@ function CheckoutPageInner() {
       try {
         const data = await getSession(sessionId);
         setSession(data);
-
         const status = String(data.metadata?.checkoutStatus ?? "pending").toLowerCase();
+
         if (["paid", "completed", "succeeded"].includes(status)) {
           setStep("success");
         } else if (status === "expired") {
           setStep("expired");
+        } else if (["failed", "cancelled", "canceled"].includes(status)) {
+          setInitiateError("O pagamento anterior não foi concluído. Pode tentar novamente.");
+          setStep("checkout");
+        } else if (returnedFromProvider) {
+          setStep("processing");
         } else {
           setStep("checkout");
         }
@@ -136,21 +145,25 @@ function CheckoutPageInner() {
     }
 
     void load();
-  }, [params?.sessionId, t]);
+  }, [params?.sessionId, returnedFromProvider, t]);
 
   const handlePollingSuccess = useCallback(() => {
     setStep("success");
-    notifyParent("SUCCESS");
-  }, []);
+    if (!successNotified.current) {
+      successNotified.current = true;
+      postParent("SUCCESS", parentOrigin);
+    }
+  }, [parentOrigin]);
 
   const handlePollingExpired = useCallback(() => {
     setStep("expired");
   }, []);
 
+  const selectedCode = selectedMethod?.code?.toLowerCase().replace(/-/g, "_") || "";
   const pollingEnabled =
     step === "awaiting" ||
     step === "processing" ||
-    (selectedMethod?.code?.toLowerCase() === "pix" && Boolean(initiateResult));
+    (selectedCode === "multibanco" && Boolean(initiateResult));
 
   usePolling({
     sessionId: params?.sessionId || "",
@@ -161,22 +174,31 @@ function CheckoutPageInner() {
     onExpired: handlePollingExpired,
     onError: (message) => {
       if (!message.startsWith("Status:")) return;
-      setInitiateError(message);
+      setInitiateError("Pagamento não concluído. Confirme os dados e tente novamente.");
+      setSelectedMethod(null);
+      setInitiateResult(null);
+      setPhoneSubmitted(false);
       setStep("checkout");
     },
   });
 
   const handleCustomerValidityChange = useCallback(
-    (isValid: boolean, data: { name: string; email: string; document?: string }) => {
+    (isValid: boolean, data: { name: string; email: string }) => {
       setCustomerValid(isValid);
-      setCustomerData((prev) => ({
-        name: data.name,
-        email: data.email,
-        document: data.document ?? "",
-      }));
+      setCustomerData({ name: data.name, email: data.email });
     },
     []
   );
+
+  const checkoutReturnUrl = useMemo(() => {
+    if (typeof window === "undefined" || !params?.sessionId) return undefined;
+    const url = new URL(`/pay/${params.sessionId}`, window.location.origin);
+    url.searchParams.set("return", "1");
+    if (embedded) url.searchParams.set("embedded", "1");
+    const requestedParentOrigin = searchParams.get("parent_origin");
+    if (requestedParentOrigin) url.searchParams.set("parent_origin", requestedParentOrigin);
+    return url.toString();
+  }, [embedded, params?.sessionId, searchParams]);
 
   const doInitiate = useCallback(
     async (methodCode: string, phone?: string) => {
@@ -185,30 +207,14 @@ function CheckoutPageInner() {
       setInitiating(true);
       setInitiateError(null);
 
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[checkout] doInitiate", {
-          methodCode,
-          sessionId: params.sessionId,
-          currency: session.currency,
-          customer: {
-            name: customerData.name,
-            email: customerData.email,
-            document: customerData.document || "(none)",
-            phone: phone || "(none)",
-          },
-        });
-      }
-
       try {
         const result = await initiatePayment({
           sessionId: params.sessionId,
           paymentMethod: methodCode,
+          returnUrl: checkoutReturnUrl,
           customer: {
             name: customerData.name,
             email: customerData.email,
-            ...(customerData.document
-              ? { document: customerData.document }
-              : {}),
             ...(phone ? { phone } : {}),
           },
         });
@@ -219,30 +225,25 @@ function CheckoutPageInner() {
           setStep("awaiting");
         }
       } catch (err) {
-        setInitiateError(
-          err instanceof Error ? err.message : t("error.initiateFailed")
-        );
+        setInitiateError(err instanceof Error ? err.message : t("error.initiateFailed"));
         setSelectedMethod(null);
         setInitiateResult(null);
+        setPhoneSubmitted(false);
       } finally {
         setInitiating(false);
       }
     },
-    [customerData, params.sessionId, session, t]
+    [checkoutReturnUrl, customerData, params.sessionId, session, t]
   );
 
   const handleSelectMethod = useCallback(
     (method: ApiPaymentMethod) => {
       if (!customerValid) return;
-
       setSelectedMethod(method);
       setInitiateResult(null);
       setInitiateError(null);
       setPhoneSubmitted(false);
-
-      if (isInstantMethodCode(method.code)) {
-        void doInitiate(method.code);
-      }
+      if (isInstantMethodCode(method.code)) void doInitiate(method.code);
     },
     [customerValid, doInitiate]
   );
@@ -270,8 +271,8 @@ function CheckoutPageInner() {
 
   if (step === "error" || !session) {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <MinimalHeader />
+      <CheckoutFrame embedded={embedded}>
+        {!embedded && <MinimalHeader />}
         <main className="flex-1">
           <StatusScreen
             step="error"
@@ -280,33 +281,38 @@ function CheckoutPageInner() {
             onRetry={() => window.location.reload()}
           />
         </main>
-        <MinimalFooter />
-      </div>
+        {!embedded && <MinimalFooter />}
+      </CheckoutFrame>
     );
   }
 
   if (step === "expired") {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <CheckoutHeader session={session} brandColor={brandColor} />
+      <CheckoutFrame embedded={embedded}>
+        <CheckoutHeader
+          session={session}
+          brandColor={brandColor}
+          embedded={embedded}
+          onClose={() => postParent("CLOSED", parentOrigin)}
+        />
         <main className="flex-1 flex items-center justify-center px-4">
           <StatusScreen step="expired" brandColor={brandColor} />
         </main>
-        <MinimalFooter />
-      </div>
+        {!embedded && <MinimalFooter />}
+      </CheckoutFrame>
     );
   }
 
-  if (step === "success" || paymentStatus === "success") {
-    const merchantReturnUrl =
-      session.returnUrl ||
-      session.metadata?.returnUrl ||
-      searchParams.get("return_url") ||
-      undefined;
-
+  if (step === "success") {
+    const merchantReturnUrl = session.returnUrl || session.metadata?.returnUrl || undefined;
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <CheckoutHeader session={session} brandColor={brandColor} />
+      <CheckoutFrame embedded={embedded}>
+        <CheckoutHeader
+          session={session}
+          brandColor={brandColor}
+          embedded={embedded}
+          onClose={() => postParent("CLOSED", parentOrigin)}
+        />
         <main className="flex-1 flex items-center justify-center px-4">
           <StatusScreen
             step="success"
@@ -315,15 +321,20 @@ function CheckoutPageInner() {
             returnUrl={merchantReturnUrl}
           />
         </main>
-        <MinimalFooter />
-      </div>
+        {!embedded && <MinimalFooter />}
+      </CheckoutFrame>
     );
   }
 
   if (step === "processing" || step === "awaiting" || step === "cancelled") {
     return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <CheckoutHeader session={session} brandColor={brandColor} />
+      <CheckoutFrame embedded={embedded}>
+        <CheckoutHeader
+          session={session}
+          brandColor={brandColor}
+          embedded={embedded}
+          onClose={() => postParent("CLOSED", parentOrigin)}
+        />
         <main className="flex-1 flex items-center justify-center px-4">
           <StatusScreen
             step={step}
@@ -332,49 +343,39 @@ function CheckoutPageInner() {
             onRetry={handleReset}
           />
         </main>
-        <MinimalFooter />
-      </div>
+        {!embedded && <MinimalFooter />}
+      </CheckoutFrame>
     );
   }
 
   const amountText = formatCurrency(session.amount, session.currency);
   const checkoutData: CheckoutData | null = initiateResult?.checkoutData ?? null;
   const stripeData = checkoutData && isStripeCheckoutData(checkoutData) ? checkoutData : null;
-  const pixData = checkoutData && isPixCheckoutData(checkoutData) ? checkoutData : null;
   const multibancoData =
     checkoutData && isMultibancoCheckoutData(checkoutData) ? checkoutData : null;
   const isLocked = initiating || Boolean(initiateResult) || phoneSubmitted;
-  const returnUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/pay/${params.sessionId}?status=success`
-      : `/pay/${params.sessionId}?status=success`;
-
   const initialName = String(session.metadata?.customerName ?? "");
   const initialEmail = String(session.metadata?.customerEmail ?? "");
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <CheckoutHeader session={session} brandColor={brandColor} />
+    <CheckoutFrame embedded={embedded}>
+      <CheckoutHeader
+        session={session}
+        brandColor={brandColor}
+        embedded={embedded}
+        onClose={() => postParent("CLOSED", parentOrigin)}
+      />
 
-      <main className="flex-1 px-4 sm:px-6 py-5 sm:py-8">
+      <main className={`flex-1 px-4 sm:px-6 ${embedded ? "py-4 sm:py-5" : "py-5 sm:py-8"}`}>
         <div className="max-w-xl mx-auto w-full space-y-4 sm:space-y-5">
-          <OrderBlock
-            session={session}
-            brandColor={brandColor}
-            onExpire={() => setStep("expired")}
-          />
+          <OrderBlock session={session} brandColor={brandColor} onExpire={() => setStep("expired")} />
 
           <CustomerBlock
             key={`${session.sessionId}:${initialName}:${initialEmail}`}
             brandColor={brandColor}
             initialName={initialName}
             initialEmail={initialEmail}
-            requireDocument={
-              session.currency.toUpperCase() === "BRL" &&
-              (session.paymentMethods ?? []).some(
-                (m) => m.code.toLowerCase() === "pix"
-              )
-            }
+            requireDocument={false}
             onValidityChange={handleCustomerValidityChange}
           />
 
@@ -399,9 +400,7 @@ function CheckoutPageInner() {
                   className="h-10 w-10 rounded-full border-2 border-t-transparent animate-spin"
                   style={{ borderColor: `${brandColor}30`, borderTopColor: "transparent" }}
                 />
-                <p className="text-sm text-muted-foreground">
-                  {t("initiate.processing")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("initiate.processing")}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -415,13 +414,7 @@ function CheckoutPageInner() {
                 exit={{ opacity: 0, y: -8 }}
               >
                 <p className="text-sm text-destructive">{initiateError}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 h-9 text-xs gap-1.5 rounded-lg"
-                  onClick={handleReset}
-                >
+                <Button type="button" variant="outline" size="sm" className="mt-3 h-9 text-xs gap-1.5 rounded-lg" onClick={handleReset}>
                   <RotateCcw className="h-3 w-3" />
                   {t("error.tryAgain")}
                 </Button>
@@ -434,12 +427,7 @@ function CheckoutPageInner() {
               isPhoneMethodCode(selectedMethod.code) &&
               !initiating &&
               step === "checkout" && (
-                <motion.div
-                  key="phone-payment"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
+                <motion.div key="phone-payment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                   <PhonePayment
                     method={selectedMethod.code}
                     brandColor={brandColor}
@@ -451,65 +439,41 @@ function CheckoutPageInner() {
               )}
 
             {selectedMethod && stripeData && !initiating && (
-              <motion.div
-                key={`stripe-${selectedMethod.code}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
+              <motion.div key={`stripe-${selectedMethod.code}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
                 <CardPayment
                   clientSecret={stripeData.clientSecret}
                   publicKey={stripeData.publicKey}
-                  returnUrl={returnUrl}
+                  returnUrl={checkoutReturnUrl || window.location.href}
                   brandColor={brandColor}
                   amount={amountText}
                 />
               </motion.div>
             )}
 
-            {selectedMethod?.code?.toLowerCase() === "pix" &&
-              pixData &&
-              !stripeData &&
-              !initiating && (
-                <motion.div
-                  key="pix-payment"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <AsyncPayment
-                    data={pixData}
-                    session={session}
-                    brandColor={brandColor}
-                    variant="pix"
-                  />
-                </motion.div>
-              )}
-
-            {selectedMethod?.code?.toLowerCase() === "multibanco" &&
-              multibancoData &&
-              !stripeData &&
-              !initiating && (
-                <motion.div
-                  key="multibanco-payment"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <AsyncPayment
-                    data={multibancoData}
-                    session={session}
-                    brandColor={brandColor}
-                    variant="multibanco"
-                    onClose={handleReset}
-                  />
-                </motion.div>
-              )}
+            {selectedCode === "multibanco" && multibancoData && !stripeData && !initiating && (
+              <motion.div key="multibanco-payment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                <AsyncPayment
+                  data={multibancoData}
+                  session={session}
+                  brandColor={brandColor}
+                  variant="multibanco"
+                  onClose={handleReset}
+                />
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </main>
 
-      <MinimalFooter />
+      {!embedded && <MinimalFooter />}
+    </CheckoutFrame>
+  );
+}
+
+function CheckoutFrame({ embedded, children }: { embedded: boolean; children: React.ReactNode }) {
+  return (
+    <div className={`${embedded ? "min-h-[100dvh]" : "min-h-screen"} flex flex-col bg-background text-foreground`}>
+      {children}
     </div>
   );
 }
@@ -533,20 +497,27 @@ function MinimalHeader() {
 function CheckoutHeader({
   session,
   brandColor,
+  embedded,
+  onClose,
 }: {
   session: CheckoutSession;
   brandColor: string;
+  embedded: boolean;
+  onClose: () => void;
 }) {
   const { t } = useI18n();
 
   const handleClose = useCallback(() => {
-    notifyParent("CLOSED");
-    try {
-      window.close();
-    } catch {
-      // Browser may block window.close for regular tabs.
+    if (embedded) {
+      onClose();
+      return;
     }
-  }, []);
+    if (session.returnUrl) {
+      window.location.assign(session.returnUrl);
+      return;
+    }
+    if (window.history.length > 1) window.history.back();
+  }, [embedded, onClose, session.returnUrl]);
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-2xl bg-background/90 border-b border-border/20">
@@ -563,11 +534,7 @@ function CheckoutHeader({
           </Button>
 
           {session.logoUrl ? (
-            <img
-              src={session.logoUrl}
-              alt={session.storeName}
-              className="h-7 w-auto max-w-[140px] object-contain"
-            />
+            <img src={session.logoUrl} alt={session.storeName} className="h-7 w-auto max-w-[140px] object-contain" />
           ) : (
             <div className="flex items-center gap-2.5 min-w-0">
               <div
@@ -576,9 +543,7 @@ function CheckoutHeader({
               >
                 {session.storeName.slice(0, 2).toUpperCase()}
               </div>
-              <span className="font-semibold text-sm text-foreground truncate">
-                {session.storeName}
-              </span>
+              <span className="font-semibold text-sm text-foreground truncate">{session.storeName}</span>
             </div>
           )}
         </div>
@@ -597,13 +562,10 @@ function CheckoutHeader({
 
 function MinimalFooter() {
   const { t } = useI18n();
-
   return (
     <div className="mt-auto flex items-center justify-center gap-1.5 pt-6 pb-4 sm:pb-5 text-[11px] text-muted-foreground/30">
       <span>{t("footer.poweredBy")}</span>
-      <span className="font-semibold text-muted-foreground/40">
-        {t("footer.xpayments")}
-      </span>
+      <span className="font-semibold text-muted-foreground/40">{t("footer.xpayments")}</span>
     </div>
   );
 }
