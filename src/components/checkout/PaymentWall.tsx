@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { ApiPaymentMethod } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
+import { useCountry } from "@/hooks/use-country";
 
 interface PaymentWallProps {
   paymentMethods: ApiPaymentMethod[];
@@ -39,31 +40,21 @@ function priority(code: string, countryCode?: string) {
 
 function logoFor(code: string) {
   switch (normalize(code)) {
-    case "mb_way":
-      return "/icons/mbway.png";
-    case "bizum":
-      return "/icons/bizum.svg";
-    case "multibanco":
-      return "/icons/multibanco.png";
-    default:
-      return null;
+    case "mb_way": return "/icons/mbway.png";
+    case "bizum": return "/icons/bizum.svg";
+    case "multibanco": return "/icons/multibanco.png";
+    default: return null;
   }
 }
 
 function subtitleFor(code: string, t: (key: string) => string) {
   switch (normalize(code)) {
-    case "card":
-      return t("block.payment.cardBrands") || "Visa, Mastercard, Amex";
-    case "stripe_all":
-      return "Apple Pay, Google Pay, Link e outros disponíveis";
-    case "mb_way":
-      return "Confirmação segura na aplicação MB WAY";
-    case "bizum":
-      return "Confirmação na aplicação do seu banco";
-    case "multibanco":
-      return "Entidade e referência para pagamento";
-    default:
-      return "Pagamento seguro";
+    case "card": return t("block.payment.cardBrands") || "Visa, Mastercard, Amex";
+    case "stripe_all": return "Apple Pay, Google Pay, Link e outros disponíveis";
+    case "mb_way": return "Confirmação segura na aplicação MB WAY";
+    case "bizum": return "Confirmação na aplicação do seu banco";
+    case "multibanco": return "Entidade e referência para pagamento";
+    default: return "Pagamento seguro";
   }
 }
 
@@ -88,8 +79,10 @@ export function PaymentWall({
   countryCode,
 }: PaymentWallProps) {
   const { t } = useI18n();
+  const detectedCountry = useCountry();
+  const effectiveCountry = countryCode || detectedCountry;
   const ordered = [...paymentMethods].sort(
-    (a, b) => priority(a.code, countryCode) - priority(b.code, countryCode)
+    (a, b) => priority(a.code, effectiveCountry) - priority(b.code, effectiveCountry)
   );
 
   return (
@@ -122,10 +115,10 @@ export function PaymentWall({
           </div>
         </div>
 
-        {countryCode && (
+        {effectiveCountry && (
           <div className="hidden items-center gap-1.5 rounded-full border border-border/50 bg-background/60 px-2.5 py-1 text-[10px] font-medium text-muted-foreground sm:flex">
             <MapPin className="h-3 w-3" />
-            {countryCode.toUpperCase()}
+            {effectiveCountry.toUpperCase()}
           </div>
         )}
       </div>
@@ -156,7 +149,7 @@ export function PaymentWall({
 
         <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-muted-foreground/70">
           <Sparkles className="h-3 w-3" />
-          Métodos priorizados de acordo com país, moeda e disponibilidade da Store.
+          Métodos priorizados por país, moeda e disponibilidade da Store.
         </div>
       </div>
     </motion.section>
@@ -246,7 +239,7 @@ function MethodCard({
 
           {isCard && (
             <div className="mt-2.5 flex items-center gap-1.5">
-              {['VISA', 'MC', 'AMEX'].map((brand) => (
+              {["VISA", "MC", "AMEX"].map((brand) => (
                 <span key={brand} className="rounded-md border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[8px] font-bold tracking-wide text-muted-foreground">
                   {brand}
                 </span>
