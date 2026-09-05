@@ -1,14 +1,15 @@
-// ── Checkout Session (V3 — Payment Orchestration) ──
+// ── Checkout Session ──
 
 export interface SessionMetadata {
   theme?: string;
   returnUrl?: string;
   description?: string;
   expiresAt?: string;
+  checkoutDisplayName?: string;
+  autoReturnSeconds?: number;
+  allowedOrigin?: string;
   [key: string]: unknown;
 }
-
-// ── API Payment Method (dynamic, from backend) ──
 
 export interface ApiPaymentMethod {
   code: string;
@@ -19,25 +20,21 @@ export interface ApiPaymentMethod {
 export interface CheckoutSession {
   sessionId: string;
   storeName: string;
+  internalStoreName?: string;
   amount: number;
   currency: string;
   reference?: string;
   description?: string;
-  // Optional branding
   logoUrl?: string;
   primaryColor?: string;
   storeId?: string;
-  // Optional metadata
   metadata?: SessionMetadata;
-  // Merchant return URL for post-payment redirect
   returnUrl?: string;
-  // Session expiration
   expiresAt?: string;
-  // Dynamic payment methods returned by the API
+  autoReturnSeconds?: number;
+  localeMode?: string;
   paymentMethods?: ApiPaymentMethod[];
 }
-
-// ── Checkout Flow Steps ──
 
 export type CheckoutStep =
   | "loading"
@@ -49,10 +46,11 @@ export type CheckoutStep =
   | "expired"
   | "cancelled";
 
-// ── Payment Method Types ──
+// ── Payment Methods ──
 
 export type PaymentMethodType =
   | "card"
+  | "stripe_all"
   | "mbway"
   | "bizum"
   | "multibanco"
@@ -66,25 +64,22 @@ export interface PaymentMethodOption {
   labelKey: string;
   icon: string;
   currencies: string[];
-  countries?: string[];       // ISO 3166-1 alpha-2
+  countries?: string[];
   comingSoon?: boolean;
-  /** Secondary icon (e.g., mastercard alongside visa for "card") */
   iconSecondary?: string;
 }
 
-/** All available payment methods — ordered by importance */
 export const PAYMENT_METHODS: PaymentMethodOption[] = [
   {
     id: "card",
     labelKey: "method.card",
-    icon: "/icons/visa.svg",
-    iconSecondary: "/icons/mastercard.svg",
-    currencies: ["EUR", "BRL", "USD"],
+    icon: "/icons/card.svg",
+    currencies: ["EUR", "BRL", "USD", "GBP", "PLN"],
   },
   {
     id: "mbway",
     labelKey: "method.mbway",
-    icon: "/icons/mbway.svg",
+    icon: "/icons/mbway.png",
     currencies: ["EUR"],
     countries: ["PT"],
   },
@@ -112,7 +107,7 @@ export const PAYMENT_METHODS: PaymentMethodOption[] = [
   {
     id: "usdt",
     labelKey: "method.usdt",
-    icon: "/icons/apple-pay.svg",
+    icon: "/icons/card.svg",
     currencies: ["USD"],
     comingSoon: true,
   },
@@ -120,98 +115,67 @@ export const PAYMENT_METHODS: PaymentMethodOption[] = [
     id: "apple_pay",
     labelKey: "method.applePay",
     icon: "/icons/apple-pay.svg",
-    currencies: ["EUR", "USD", "BRL"],
+    currencies: ["EUR", "USD", "BRL", "GBP"],
     comingSoon: true,
   },
   {
     id: "google_pay",
     labelKey: "method.googlePay",
-    icon: "/icons/apple-pay.svg",
-    currencies: ["EUR", "USD", "BRL"],
+    icon: "/icons/card.svg",
+    currencies: ["EUR", "USD", "BRL", "GBP"],
     comingSoon: true,
   },
 ];
 
-/**
- * Country → payment method priority order.
- * Used for geolocation-based method filtering and ordering.
- */
 export const COUNTRY_METHOD_PRIORITY: Record<string, PaymentMethodType[]> = {
-  PT: ["card", "mbway", "multibanco"],
-  ES: ["card", "bizum"],
-  BR: ["pix", "card"],
-  FR: ["card"],
-  DE: ["card"],
-  IT: ["card"],
-  GB: ["card"],
-  US: ["card"],
-  IE: ["card"],
-  NL: ["card"],
-  BE: ["card"],
-  LU: ["card"],
-  CH: ["card"],
-  AO: ["card"],
-  MZ: ["card"],
-  CV: ["card"],
+  PT: ["mbway", "multibanco", "card", "stripe_all"],
+  ES: ["bizum", "card", "stripe_all"],
+  BR: ["pix", "card", "stripe_all"],
+  FR: ["card", "stripe_all"],
+  DE: ["card", "stripe_all"],
+  IT: ["card", "stripe_all"],
+  GB: ["card", "stripe_all"],
+  US: ["card", "stripe_all"],
+  IE: ["card", "stripe_all"],
+  NL: ["card", "stripe_all"],
+  BE: ["card", "stripe_all"],
+  LU: ["card", "stripe_all"],
+  CH: ["card", "stripe_all"],
+  AO: ["card", "stripe_all"],
+  MZ: ["card", "stripe_all"],
+  CV: ["card", "stripe_all"],
 };
 
-/**
- * Filter and order payment methods for a given currency and country.
- * Country takes priority for ordering. Currency is the hard filter.
- * Falls back to currency-only if country has no mapping.
- */
 export function getPaymentMethods(
   currency: string,
   countryCode?: string
 ): PaymentMethodOption[] {
   const upper = currency.toUpperCase();
-
-  // Step 1: Filter by currency and remove "coming soon"
   const available = PAYMENT_METHODS.filter(
-    (m) => m.currencies.includes(upper) && !m.comingSoon
+    (method) => method.currencies.includes(upper) && !method.comingSoon
   );
 
-  // Step 2: If country is detected, apply country-based filtering
-  if (countryCode) {
-    const countryOrder = COUNTRY_METHOD_PRIORITY[countryCode.toUpperCase()];
+  if (!countryCode) return available;
+  const country = countryCode.toUpperCase();
+  const order = COUNTRY_METHOD_PRIORITY[country];
+  if (!order) return available;
 
-    if (countryOrder) {
-      // Filter to only methods allowed for this country + currency
-      const countryMethods = available.filter((m) => {
-        // If method has no country restriction, it's available everywhere
-        if (!m.countries || m.countries.length === 0) return true;
-        return m.countries.includes(countryCode.toUpperCase());
-      });
+  const countryMethods = available.filter(
+    (method) => !method.countries?.length || method.countries.includes(country)
+  );
 
-      // Sort by country priority
-      const ordered: PaymentMethodOption[] = [];
-      for (const methodId of countryOrder) {
-        const found = countryMethods.find((m) => m.id === methodId);
-        if (found) ordered.push(found);
-      }
-
-      // Add any remaining methods not in the priority list
-      for (const m of countryMethods) {
-        if (!ordered.find((o) => o.id === m.id)) {
-          ordered.push(m);
-        }
-      }
-
-      return ordered.length > 0 ? ordered : available;
-    }
-  }
-
-  return available;
+  return [...countryMethods].sort((a, b) => {
+    const aIndex = order.indexOf(a.id);
+    const bIndex = order.indexOf(b.id);
+    return (aIndex === -1 ? 100 : aIndex) - (bIndex === -1 ? 100 : bIndex);
+  });
 }
 
-/** Legacy alias for backwards compatibility */
-export function getPaymentMethodsForCurrency(
-  currency: string
-): PaymentMethodOption[] {
+export function getPaymentMethodsForCurrency(currency: string): PaymentMethodOption[] {
   return getPaymentMethods(currency);
 }
 
-// ── Customer (V3 — name + email required; phone optional for MBWAY/Bizum) ──
+// ── Customer / API contracts ──
 
 export interface CustomerPayload {
   name: string;
@@ -232,15 +196,13 @@ export interface CustomerForm {
   vatId?: string;
 }
 
-// ── V3 Initiate Payment Request ──
-
 export interface InitiatePaymentRequest {
   sessionId: string;
   paymentMethod: string;
   customer: CustomerPayload;
+  returnUrl?: string;
+  paymentMethodOptions?: Record<string, unknown>;
 }
-
-// ── Gateway Response Types ──
 
 export type GatewayType = string;
 
@@ -248,6 +210,7 @@ export interface StripeCheckoutData {
   clientSecret: string;
   providerTxId: string;
   publicKey: string;
+  dynamicMethods?: boolean;
 }
 
 export interface PixCheckoutData {
@@ -259,7 +222,7 @@ export interface PixCheckoutData {
   qrCode?: string;
   qrCodeBase64?: string;
   expiresAt?: string;
-  expiration?: number;  // seconds until expiration
+  expiration?: number;
 }
 
 export interface MultibancoCheckoutData {
@@ -272,6 +235,9 @@ export interface MultibancoCheckoutData {
 export interface PhoneCheckoutData {
   providerTxId: string;
   status?: string;
+  actionType?: string | null;
+  message?: string | null;
+  redirectUrl?: string;
 }
 
 export type CheckoutData =
@@ -280,18 +246,6 @@ export type CheckoutData =
   | MultibancoCheckoutData
   | PhoneCheckoutData;
 
-/**
- * V3 Initiate Response — the Master Backend returns:
- * {
- *   success: true,
- *   data: {
- *     gateway: "STRIPE",
- *     providerAction: {
- *       checkoutData: { clientSecret, publicKey, ... }
- *     }
- *   }
- * }
- */
 export interface InitiateCheckoutResponse {
   success: boolean;
   data: {
@@ -305,7 +259,6 @@ export interface InitiateCheckoutResponse {
   };
 }
 
-/** Normalised result returned to the page */
 export interface NormalisedInitiateResult {
   gateway: string;
   checkoutData: CheckoutData;
@@ -313,8 +266,12 @@ export interface NormalisedInitiateResult {
 
 // ── Phone Validation ──
 
-export const PHONE_COUNTRY_PREFIXES: Record<string, { country: string; prefix: string; digits: number }> = {
+export const PHONE_COUNTRY_PREFIXES: Record<
+  string,
+  { country: string; prefix: string; digits: number }
+> = {
   mbway: { country: "PT", prefix: "+351", digits: 9 },
+  mb_way: { country: "PT", prefix: "+351", digits: 9 },
   bizum: { country: "ES", prefix: "+34", digits: 9 },
 };
 
@@ -333,30 +290,20 @@ export function validatePhoneForMethod(
   const digitsOnly = cleaned.replace(/^\+/, "");
   const digitCount = digitsOnly.replace(/^351|^34/, "").length;
 
-  if (!hasPrefix && digitCount !== rule.digits) {
+  if (!hasPrefix && digitCount !== rule.digits) return "phone.countryMismatch";
+  if (hasPrefix && cleaned.slice(rule.prefix.length).length !== rule.digits) {
     return "phone.countryMismatch";
   }
-  if (hasPrefix) {
-    const afterPrefix = cleaned.slice(rule.prefix.length);
-    if (afterPrefix.length !== rule.digits) {
-      return "phone.countryMismatch";
-    }
-  }
-
   return null;
 }
 
 // ── Type Guards ──
 
-export function isStripeCheckoutData(
-  data: CheckoutData
-): data is StripeCheckoutData {
+export function isStripeCheckoutData(data: CheckoutData): data is StripeCheckoutData {
   return "clientSecret" in data;
 }
 
-export function isPixCheckoutData(
-  data: CheckoutData
-): data is PixCheckoutData {
+export function isPixCheckoutData(data: CheckoutData): data is PixCheckoutData {
   return "pixString" in data || "pixCode" in data || "copyPaste" in data;
 }
 
@@ -366,10 +313,8 @@ export function isMultibancoCheckoutData(
   return "entity" in data && "reference" in data;
 }
 
-export function isPhoneCheckoutData(
-  data: CheckoutData
-): data is PhoneCheckoutData {
-  return !("clientSecret" in data) && !("pixString" in data) && !("pixCode" in data) && !("copyPaste" in data) && !("entity" in data);
+export function isPhoneCheckoutData(data: CheckoutData): data is PhoneCheckoutData {
+  return !isStripeCheckoutData(data) && !isPixCheckoutData(data) && !isMultibancoCheckoutData(data);
 }
 
 export function getPixCode(data: PixCheckoutData): string {
@@ -377,18 +322,23 @@ export function getPixCode(data: PixCheckoutData): string {
 }
 
 export function isQrCodeImage(qrCode: string | undefined): boolean {
-  if (!qrCode) return false;
-  return qrCode.startsWith("http") || qrCode.startsWith("data:");
+  return Boolean(qrCode && (qrCode.startsWith("http") || qrCode.startsWith("data:")));
 }
 
 export function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat("pt-BR", {
+  const locale =
+    typeof navigator !== "undefined" && navigator.language
+      ? navigator.language
+      : currency.toUpperCase() === "BRL"
+        ? "pt-BR"
+        : "pt-PT";
+
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
   }).format(amount);
 }
 
-/** Format countdown as MM:SS */
 export function formatCountdown(ms: number): string {
   if (ms <= 0) return "00:00";
   const totalSeconds = Math.floor(ms / 1000);
@@ -399,57 +349,66 @@ export function formatCountdown(ms: number): string {
 
 // ── Country Detection ──
 
-/** Map browser language codes to ISO country codes */
 export const LANG_TO_COUNTRY: Record<string, string> = {
   pt: "PT", "pt-pt": "PT", "pt-br": "BR",
   en: "US", "en-us": "US", "en-gb": "GB", "en-ie": "IE",
   es: "ES", "es-es": "ES",
   fr: "FR", "fr-fr": "FR", "fr-be": "BE",
-  de: "DE", "de-de": "DE", "de-at": "DE", "de-ch": "CH",
+  de: "DE", "de-de": "DE", "de-at": "AT", "de-ch": "CH",
   it: "IT", "it-it": "IT",
   nl: "NL", "nl-nl": "NL", "nl-be": "BE",
-  lu: "LU",
+  pl: "PL", "pl-pl": "PL",
   ao: "AO", mz: "MZ", cv: "CV",
 };
 
-/**
- * Detect country from browser locale.
- * Returns ISO 3166-1 alpha-2 code.
- */
+const TIMEZONE_TO_COUNTRY: Record<string, string> = {
+  "Europe/Lisbon": "PT",
+  "Atlantic/Madeira": "PT",
+  "Europe/Madrid": "ES",
+  "America/Sao_Paulo": "BR",
+  "America/Fortaleza": "BR",
+  "America/Recife": "BR",
+  "America/Manaus": "BR",
+  "Europe/London": "GB",
+  "Europe/Paris": "FR",
+  "Europe/Berlin": "DE",
+  "Europe/Rome": "IT",
+  "Europe/Amsterdam": "NL",
+  "Europe/Brussels": "BE",
+  "Europe/Warsaw": "PL",
+};
+
 export function detectCountryFromLocale(): string {
   try {
-    const lang = typeof navigator !== "undefined" ? (navigator.language || "pt-PT") : "pt-PT";
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (timezone && TIMEZONE_TO_COUNTRY[timezone]) return TIMEZONE_TO_COUNTRY[timezone];
+
+    const lang = typeof navigator !== "undefined" ? navigator.language || "pt-PT" : "pt-PT";
     const normalized = lang.toLowerCase().trim();
-    return LANG_TO_COUNTRY[normalized] || "PT";
+    return LANG_TO_COUNTRY[normalized] || LANG_TO_COUNTRY[normalized.split("-")[0]] || "PT";
   } catch {
     return "PT";
   }
 }
 
-// ── Methods that require phone input before initiating ──
+// ── Method classification ──
 
 export const PHONE_METHODS: PaymentMethodType[] = ["mbway", "bizum"];
+export const INSTANT_METHODS: PaymentMethodType[] = ["card", "stripe_all", "pix", "multibanco"];
 
-/** Methods that initiate immediately on click */
-export const INSTANT_METHODS: PaymentMethodType[] = ["card", "pix", "multibanco"];
+const PHONE_METHOD_CODES = new Set(["mbway", "bizum", "mb_way"]);
+const INSTANT_METHOD_CODES = new Set(["card", "stripe_all", "pix", "multibanco"]);
 
-// ── String-based method classification (works with any code from API) ──
-
-const PHONE_METHOD_CODES = new Set(["mbway", "bizum", "mb_way", "MB_WAY"]);
-const INSTANT_METHOD_CODES = new Set(["card", "pix", "multibanco"]);
-
-/** Check if a method code (from API) requires phone input */
 export function isPhoneMethodCode(code: string): boolean {
   const normalized = code.toLowerCase().replace(/-/g, "_");
-  return PHONE_METHOD_CODES.has(code.toLowerCase()) || PHONE_METHOD_CODES.has(normalized);
+  return PHONE_METHOD_CODES.has(normalized);
 }
 
-/** Check if a method code (from API) initiates immediately on click */
 export function isInstantMethodCode(code: string): boolean {
-  return INSTANT_METHOD_CODES.has(code.toLowerCase());
+  return INSTANT_METHOD_CODES.has(code.toLowerCase().replace(/-/g, "_"));
 }
 
-// ── Visual config map for known method codes ──
+// ── Visual config ──
 
 export interface MethodVisualConfig {
   labelKey: string;
@@ -459,21 +418,30 @@ export interface MethodVisualConfig {
 }
 
 export const METHOD_VISUAL_MAP: Record<string, MethodVisualConfig> = {
-  card: { labelKey: "method.card", icon: "/icons/visa.svg", iconSecondary: "/icons/mastercard.svg", isCard: true },
+  card: { labelKey: "method.card", icon: "/icons/card.svg", isCard: true },
+  stripe_all: { labelKey: "", icon: "/icons/card.svg" },
   mbway: { labelKey: "method.mbway", icon: "/icons/mbway.png" },
   mb_way: { labelKey: "method.mbway", icon: "/icons/mbway.png" },
   bizum: { labelKey: "method.bizum", icon: "/icons/bizum.svg" },
   multibanco: { labelKey: "method.multibanco", icon: "/icons/multibanco.png" },
   pix: { labelKey: "method.pix", icon: "/icons/pix.svg" },
-  usdt: { labelKey: "method.usdt", icon: "/icons/apple-pay.svg" },
+  usdt: { labelKey: "method.usdt", icon: "/icons/card.svg" },
   apple_pay: { labelKey: "method.applePay", icon: "/icons/apple-pay.svg" },
-  google_pay: { labelKey: "method.googlePay", icon: "/icons/apple-pay.svg" },
+  google_pay: { labelKey: "method.googlePay", icon: "/icons/card.svg" },
 };
 
-/** Get visual config for a method code, with fallback */
-export function getMethodVisual(code: string): MethodVisualConfig & { resolvedLabel: string } {
-  const known = METHOD_VISUAL_MAP[code.toLowerCase()];
-  if (known) return { ...known, resolvedLabel: "" };
+export function getMethodVisual(
+  code: string
+): MethodVisualConfig & { resolvedLabel: string } {
+  const normalized = code.toLowerCase().replace(/-/g, "_");
+  const known = METHOD_VISUAL_MAP[normalized];
+  if (known) {
+    return {
+      ...known,
+      resolvedLabel: normalized === "stripe_all" ? "Mais opções" : "",
+    };
+  }
+
   return {
     labelKey: "",
     icon: "/icons/card.svg",
@@ -481,7 +449,6 @@ export function getMethodVisual(code: string): MethodVisualConfig & { resolvedLa
   };
 }
 
-/** Check if a method code is a card-type method */
 export function isCardMethodCode(code: string): boolean {
-  return code.toLowerCase() === "card";
+  return code.toLowerCase().replace(/-/g, "_") === "card";
 }
