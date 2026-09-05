@@ -1,21 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { loadStripe, StripeElementsOptions } from "@stripe/stripe-js";
+import { loadStripe, type StripeElementsOptions } from "@stripe/stripe-js";
 import {
   Elements,
   PaymentElement,
-  useStripe,
   useElements,
+  useStripe,
 } from "@stripe/react-stripe-js";
 import { useTheme } from "next-themes";
 import { motion } from "framer-motion";
+import {
+  AlertTriangle,
+  CreditCard,
+  Loader2,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, Shield, AlertTriangle, CreditCard } from "lucide-react";
 import { StripeErrorBoundary } from "@/components/checkout/StripeErrorBoundary";
 import { useI18n } from "@/lib/i18n";
-
-// ── Inner Checkout Form ──
 
 function CheckoutForm({
   returnUrl,
@@ -32,8 +37,8 @@ function CheckoutForm({
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     if (!stripe || !elements) return;
 
     setIsLoading(true);
@@ -47,8 +52,8 @@ function CheckoutForm({
     if (error) {
       setMessage(
         error.type === "card_error" || error.type === "validation_error"
-          ? error.message ?? "Card error"
-          : "An unexpected error occurred. Please try again."
+          ? error.message ?? "Payment validation error"
+          : "Não foi possível concluir o pagamento. Tente novamente."
       );
     }
 
@@ -58,16 +63,27 @@ function CheckoutForm({
   return (
     <motion.form
       onSubmit={handleSubmit}
-      className="space-y-4"
-      initial={{ opacity: 0, y: 6 }}
+      className="space-y-5"
+      initial={{ opacity: 0, y: 7 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <PaymentElement options={{ layout: "accordion" }} />
+      <div className="rounded-[20px] border border-border/50 bg-background/70 p-3 sm:p-4">
+        <PaymentElement
+          options={{
+            layout: {
+              type: "accordion",
+              defaultCollapsed: false,
+              radios: true,
+              spacedAccordionItems: true,
+            },
+          }}
+        />
+      </div>
 
       {message && (
         <motion.div
-          className="rounded-lg bg-destructive/10 border border-destructive/20 p-3"
+          className="rounded-2xl border border-destructive/20 bg-destructive/[0.05] p-3.5"
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -77,7 +93,7 @@ function CheckoutForm({
 
       <Button
         type="submit"
-        className="w-full h-12 text-sm font-semibold gap-2 rounded-xl"
+        className="h-12 w-full gap-2 rounded-2xl text-sm font-semibold shadow-[0_14px_38px_-20px_rgba(0,0,0,.55)]"
         style={brandColor ? { backgroundColor: brandColor, color: "#fff" } : undefined}
         disabled={!stripe || !elements || isLoading}
       >
@@ -88,53 +104,51 @@ function CheckoutForm({
           </>
         ) : (
           <>
-            <Lock className="h-4 w-4" />
+            <LockKeyhole className="h-4 w-4" />
             {amount ? t("card.payNowAmount").replace("{amount}", amount) : t("card.payNow")}
           </>
         )}
       </Button>
 
-      <div className="flex items-center justify-center gap-2 pt-1">
-        <Shield className="h-3 w-3 text-muted-foreground/50" />
-        <p className="text-[11px] text-muted-foreground/50">
-          {t("card.encrypted")}
-        </p>
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-1 text-[10px] text-muted-foreground/65">
+        <span className="inline-flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          PCI-secure Stripe Elements
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5" />
+          Métodos elegíveis aparecem automaticamente
+        </span>
       </div>
     </motion.form>
   );
 }
 
-// ── Fallbacks ──
-
 function KeyMissing() {
   const { t } = useI18n();
-
   return (
-    <div className="py-8 text-center space-y-3">
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-        <CreditCard className="h-5 w-5 text-muted-foreground" />
+    <div className="py-10 text-center">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-border/50 bg-muted/30">
+        <CreditCard className="h-6 w-6 text-muted-foreground" />
       </div>
-      <p className="text-sm font-medium text-foreground">{t("card.keyMissing")}</p>
-      <p className="text-xs text-muted-foreground">{t("card.keyMissingDesc")}</p>
+      <p className="mt-4 text-sm font-semibold text-foreground">{t("card.keyMissing")}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{t("card.keyMissingDesc")}</p>
     </div>
   );
 }
 
 function CrashFallback() {
   const { t } = useI18n();
-
   return (
-    <div className="py-8 text-center space-y-3">
-      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
-        <AlertTriangle className="h-5 w-5 text-amber-500" />
+    <div className="py-10 text-center">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/10">
+        <AlertTriangle className="h-6 w-6 text-amber-500" />
       </div>
-      <p className="text-sm font-medium text-foreground">{t("card.crashTitle")}</p>
-      <p className="text-xs text-muted-foreground whitespace-pre-line">{t("card.crashDesc")}</p>
+      <p className="mt-4 text-sm font-semibold text-foreground">{t("card.crashTitle")}</p>
+      <p className="mt-1 whitespace-pre-line text-xs text-muted-foreground">{t("card.crashDesc")}</p>
     </div>
   );
 }
-
-// ── Main Card Payment Component ──
 
 interface CardPaymentProps {
   clientSecret: string;
@@ -154,10 +168,10 @@ export function CardPayment({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  const stripePromise = useMemo(() => {
-    if (!publicKey) return null;
-    return loadStripe(publicKey);
-  }, [publicKey]);
+  const stripePromise = useMemo(
+    () => (publicKey ? loadStripe(publicKey) : null),
+    [publicKey]
+  );
 
   const options: StripeElementsOptions = useMemo(
     () => ({
@@ -166,51 +180,83 @@ export function CardPayment({
         theme: isDark ? "night" : "stripe",
         variables: {
           colorPrimary: brandColor || "#111111",
-          colorBackground: isDark ? "#09090b" : "#ffffff",
-          colorText: isDark ? "#fafafa" : "#1a1a1a",
-          colorTextSecondary: isDark ? "#a1a1aa" : "#6b7280",
+          colorBackground: isDark ? "#0a0a0b" : "#ffffff",
+          colorText: isDark ? "#fafafa" : "#18181b",
+          colorTextSecondary: isDark ? "#a1a1aa" : "#71717a",
           colorDanger: "#ef4444",
-          fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-          borderRadius: "10px",
+          fontFamily: "var(--font-geist-sans), Inter, system-ui, sans-serif",
+          borderRadius: "14px",
+          spacingUnit: "4px",
           spacingBranding: "none",
         },
-        ...(isDark && {
-          rules: {
-            ".Label": { color: "#a1a1aa", fontSize: "13px", fontWeight: "500" },
-            ".Input": { backgroundColor: "#0a0a0a", borderColor: "#27272a" },
-            ".Input:focus": { borderColor: brandColor || "#111111" },
-            ".Tab": { color: "#a1a1aa" },
-            ".Tab:hover": { color: "#fafafa" },
-            ".Tab--selected": { color: "#fafafa", borderColor: brandColor || "#111111" },
+        rules: {
+          ".Label": {
+            fontSize: "12px",
+            fontWeight: "600",
+            color: isDark ? "#d4d4d8" : "#52525b",
           },
-        }),
+          ".Input": {
+            borderColor: isDark ? "#27272a" : "#e4e4e7",
+            boxShadow: "none",
+          },
+          ".Input:focus": {
+            borderColor: brandColor || "#18181b",
+            boxShadow: `0 0 0 1px ${brandColor || "#18181b"}`,
+          },
+          ".Tab": {
+            borderRadius: "14px",
+            borderColor: isDark ? "#27272a" : "#e4e4e7",
+            boxShadow: "none",
+          },
+          ".Tab--selected": {
+            borderColor: brandColor || "#18181b",
+            boxShadow: `0 0 0 1px ${brandColor || "#18181b"}`,
+          },
+        },
       },
     }),
     [clientSecret, brandColor, isDark]
   );
 
-  if (!publicKey || !stripePromise) {
-    return <KeyMissing />;
-  }
+  if (!publicKey || !stripePromise) return <KeyMissing />;
 
   return (
-    <motion.div
-      className="rounded-2xl border border-border/30 bg-card/80 backdrop-blur-sm overflow-hidden"
+    <motion.section
+      className="relative overflow-hidden rounded-[28px] border border-border/50 bg-card/90 shadow-[0_24px_70px_-42px_rgba(15,23,42,.6)] backdrop-blur-xl"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="p-5 sm:p-6">
-      <StripeErrorBoundary fallback={<CrashFallback />}>
-        <Elements stripe={stripePromise} options={options}>
-          <CheckoutForm
-            returnUrl={returnUrl}
-            amount={amount}
-            brandColor={brandColor}
-          />
-        </Elements>
-      </StripeErrorBoundary>
+      <div
+        className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full opacity-10 blur-3xl"
+        style={{ backgroundColor: brandColor || "#111111" }}
+      />
+
+      <div className="relative border-b border-border/40 px-5 py-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl border border-border/50 bg-background shadow-sm">
+            <CreditCard className="h-5 w-5 text-foreground" strokeWidth={1.7} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight">Pagamento seguro</h3>
+            <p className="mt-0.5 text-[10.5px] text-muted-foreground">
+              Stripe apresenta os métodos disponíveis para este pagamento.
+            </p>
+          </div>
+        </div>
       </div>
-    </motion.div>
+
+      <div className="relative p-5 sm:p-6">
+        <StripeErrorBoundary fallback={<CrashFallback />}>
+          <Elements stripe={stripePromise} options={options}>
+            <CheckoutForm
+              returnUrl={returnUrl}
+              amount={amount}
+              brandColor={brandColor}
+            />
+          </Elements>
+        </StripeErrorBoundary>
+      </div>
+    </motion.section>
   );
 }
