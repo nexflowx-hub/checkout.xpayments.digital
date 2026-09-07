@@ -1,7 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Layers3, LockKeyhole, MapPin, ShieldCheck, WalletCards } from "lucide-react";
+import {
+  Check,
+  Layers3,
+  LockKeyhole,
+  MapPin,
+  ShieldCheck,
+  WalletCards,
+} from "lucide-react";
 import type { ApiPaymentMethod } from "@/types/checkout";
 import { useI18n } from "@/lib/i18n";
 import { useCountry } from "@/hooks/use-country";
@@ -26,49 +33,72 @@ function priority(code: string, countryCode?: string) {
     ES: ["bizum", "card", "stripe_all", "mb_way", "multibanco"],
     BR: ["pix", "card", "stripe_all"],
   };
-  const order = orders[country] || ["card", "stripe_all", "mb_way", "bizum", "multibanco", "pix"];
+  const order =
+    orders[country] || ["card", "stripe_all", "mb_way", "bizum", "multibanco", "pix"];
   const index = order.indexOf(method);
   return index === -1 ? 100 : index;
 }
 
 function logoFor(code: string) {
   switch (normalize(code)) {
-    case "mb_way": return "/icons/mbway.svg";
-    case "bizum": return "/icons/bizum.svg";
-    case "multibanco": return "/icons/multibanco.png";
-    case "pix": return "/icons/pix.svg";
-    default: return null;
+    // Restore the previous raster asset here. The SVG in the repository is
+    // the negative (white-lettering) MB WAY variant and becomes illegible
+    // inside the checkout's white method tile.
+    case "mb_way":
+      return "/icons/mbway.png";
+    case "bizum":
+      return "/icons/bizum.svg";
+    case "multibanco":
+      return "/icons/multibanco.png";
+    case "pix":
+      return "/icons/pix.svg";
+    default:
+      return null;
   }
 }
 
 function subtitleFor(code: string, t: (key: string) => string) {
   switch (normalize(code)) {
-    case "card": return t("block.payment.cardBrands") || "Cartões e wallets compatíveis";
-    case "stripe_all": return "Wallets e métodos elegíveis para este pagamento";
-    case "mb_way": return "Confirme diretamente na aplicação MB WAY";
-    case "bizum": return "Autorize na aplicação do seu banco";
-    case "multibanco": return "Receba Entidade e Referência de pagamento";
-    case "pix": return "QR Code e PIX Copia e Cola com confirmação automática";
-    default: return "Pagamento protegido e processado de forma segura";
+    case "card":
+      return t("block.payment.cardBrands") || "Cartões e wallets compatíveis";
+    case "stripe_all":
+      return "Wallets e métodos elegíveis para este pagamento";
+    case "mb_way":
+      return "Confirme diretamente na aplicação MB WAY";
+    case "bizum":
+      return "Autorize na aplicação do seu banco";
+    case "multibanco":
+      return "Receba Entidade e Referência de pagamento";
+    case "pix":
+      return "QR Code e PIX Copia e Cola com confirmação automática";
+    default:
+      return "Pagamento protegido e processado de forma segura";
   }
 }
 
 function labelFor(method: ApiPaymentMethod, t: (key: string) => string) {
   switch (normalize(method.code)) {
-    case "card": return t("method.card") || "Cartão";
-    case "stripe_all": return "Mais opções";
-    case "mb_way": return t("method.mbway") || "MB WAY";
-    case "bizum": return t("method.bizum") || "Bizum";
-    case "multibanco": return t("method.multibanco") || "Multibanco";
-    case "pix": return t("method.pix") || "PIX";
-    default: return method.label || method.code;
+    case "card":
+      return t("method.card") || "Cartão";
+    case "stripe_all":
+      return "Mais opções";
+    case "mb_way":
+      return t("method.mbway") || "MB WAY";
+    case "bizum":
+      return t("method.bizum") || "Bizum";
+    case "multibanco":
+      return t("method.multibanco") || "Multibanco";
+    case "pix":
+      return t("method.pix") || "PIX";
+    default:
+      return method.label || method.code;
   }
 }
 
 function methodTexture(code: string, brandColor: string) {
   switch (normalize(code)) {
     case "mb_way":
-      return "radial-gradient(circle at 92% 8%, rgba(237,28,36,.10), transparent 34%), linear-gradient(135deg, rgba(255,255,255,.99), rgba(250,250,250,.94))";
+      return "radial-gradient(circle at 92% 8%, rgba(229,0,23,.10), transparent 34%), linear-gradient(135deg, rgba(255,255,255,.99), rgba(250,250,250,.94))";
     case "bizum":
       return "radial-gradient(circle at 92% 8%, rgba(0,169,165,.12), transparent 36%), linear-gradient(135deg, rgba(255,255,255,.99), rgba(248,252,252,.95))";
     case "multibanco":
@@ -114,13 +144,21 @@ export function PaymentWall({
         <div className="flex items-start gap-3">
           <div
             className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border"
-            style={{ backgroundColor: `${brandColor}0D`, borderColor: `${brandColor}20`, color: brandColor }}
+            style={{
+              backgroundColor: `${brandColor}0D`,
+              borderColor: `${brandColor}20`,
+              color: brandColor,
+            }}
           >
             <WalletCards className="h-[18px] w-[18px]" strokeWidth={1.8} />
           </div>
           <div>
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">{t("block.payment.title")}</h2>
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">Escolha a forma de pagamento mais conveniente.</p>
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">
+              {t("block.payment.title")}
+            </h2>
+            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+              Escolha a forma de pagamento mais conveniente.
+            </p>
           </div>
         </div>
 
@@ -186,6 +224,7 @@ function MethodCard({
   const logo = logoFor(code);
   const isCard = code === "card";
   const isMore = code === "stripe_all";
+  const isMbWay = code === "mb_way";
 
   return (
     <motion.button
@@ -208,13 +247,20 @@ function MethodCard({
     >
       <div className="relative flex h-full items-start gap-3.5">
         <div
-          className="grid h-[54px] w-[60px] shrink-0 place-items-center overflow-hidden rounded-[17px] border bg-white shadow-[0_8px_24px_-20px_rgba(15,23,42,.6)]"
+          className={`grid h-[54px] shrink-0 place-items-center overflow-hidden rounded-[17px] border bg-white shadow-[0_8px_24px_-20px_rgba(15,23,42,.6)] ${
+            isMbWay ? "w-[78px]" : "w-[60px]"
+          }`}
           style={{ borderColor: selected ? `${brandColor}30` : "rgba(148,163,184,.22)" }}
         >
           {isCard ? (
             <div className="flex items-center gap-1.5 px-2">
               <img src="/icons/visa.svg" alt="Visa" className="h-[13px] w-auto" draggable={false} />
-              <img src="/icons/mastercard.svg" alt="Mastercard" className="h-[24px] w-auto" draggable={false} />
+              <img
+                src="/icons/mastercard.svg"
+                alt="Mastercard"
+                className="h-[24px] w-auto"
+                draggable={false}
+              />
             </div>
           ) : isMore ? (
             <div className="flex items-center gap-1.5 px-2">
@@ -225,7 +271,13 @@ function MethodCard({
             <img
               src={logo}
               alt={label}
-              className={`${code === "multibanco" ? "max-h-9 max-w-[48px]" : "max-h-8 max-w-[48px]"} object-contain`}
+              className={
+                isMbWay
+                  ? "max-h-[38px] max-w-[68px] object-contain"
+                  : code === "multibanco"
+                    ? "max-h-9 max-w-[48px] object-contain"
+                    : "max-h-8 max-w-[48px] object-contain"
+              }
               draggable={false}
             />
           ) : (
@@ -237,7 +289,9 @@ function MethodCard({
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-[13px] font-semibold tracking-tight text-foreground">{label}</p>
-              <p className="mt-1 line-clamp-2 text-[10.5px] leading-[1.5] text-muted-foreground">{subtitle}</p>
+              <p className="mt-1 line-clamp-2 text-[10.5px] leading-[1.5] text-muted-foreground">
+                {subtitle}
+              </p>
             </div>
             <AnimatePresence>
               {selected && (
@@ -256,8 +310,12 @@ function MethodCard({
 
           {isCard && (
             <div className="mt-2.5 flex items-center gap-1.5">
-              <span className="rounded-full border border-border/50 bg-white/80 px-2 py-0.5 text-[8px] font-semibold tracking-wide text-zinc-600">3DS</span>
-              <span className="rounded-full border border-border/50 bg-white/80 px-2 py-0.5 text-[8px] font-semibold tracking-wide text-zinc-600">PCI</span>
+              <span className="rounded-full border border-border/50 bg-white/80 px-2 py-0.5 text-[8px] font-semibold tracking-wide text-zinc-600">
+                3DS
+              </span>
+              <span className="rounded-full border border-border/50 bg-white/80 px-2 py-0.5 text-[8px] font-semibold tracking-wide text-zinc-600">
+                PCI
+              </span>
             </div>
           )}
 
