@@ -1,25 +1,36 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface CountdownTimerProps {
-  /** Target timestamp (ISO string or epoch ms) */
   targetDate?: string | number;
-  /** Duration in seconds (alternative to targetDate) */
   durationSeconds?: number;
-  /** Called when countdown reaches zero */
   onExpire?: () => void;
-  /** Render prop or children */
-  children?: (time: { minutes: number; seconds: number; total: number; formatted: string; isExpired: boolean }) => React.ReactNode;
-  /** If true, does not start counting */
+  children?: (time: {
+    minutes: number;
+    seconds: number;
+    total: number;
+    formatted: string;
+    isExpired: boolean;
+    ready: boolean;
+  }) => React.ReactNode;
   paused?: boolean;
-  /** Custom className for wrapper */
   className?: string;
 }
 
+function calculateInitial(targetDate?: string | number, durationSeconds?: number): number {
+  if (targetDate) {
+    const target = typeof targetDate === "string" ? new Date(targetDate).getTime() : targetDate;
+    return Math.max(0, target - Date.now());
+  }
+  if (durationSeconds) return Math.max(0, durationSeconds * 1000);
+  return 0;
+}
+
 /**
- * Reusable countdown timer component.
- * Can be used with a target date or a duration.
+ * Hydration-safe checkout countdown. The server and the first browser render
+ * both use a neutral placeholder; the real remaining time is calculated after
+ * mount so SSR never disagrees with the client clock.
  */
 export function CountdownTimer({
   targetDate,
@@ -29,60 +40,61 @@ export function CountdownTimer({
   paused = false,
   className,
 }: CountdownTimerProps) {
-  const [timeLeft, setTimeLeft] = useState(() => {
-    if (targetDate) {
-      const target = typeof targetDate === "string" ? new Date(targetDate).getTime() : targetDate;
-      return Math.max(0, target - Date.now());
-    }
-    if (durationSeconds) {
-      return durationSeconds * 1000;
-    }
-    return 0;
-  });
-
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const onExpireRef = useRef(onExpire);
-
   const hasExpiredRef = useRef(false);
 
   useEffect(() => {
     onExpireRef.current = onExpire;
   }, [onExpire]);
 
-  // Recalculate when target changes
-  const computedTarget = useMemo(() => {
-    if (!targetDate) return null;
-    return typeof targetDate === "string" ? new Date(targetDate).getTime() : targetDate;
-  }, [targetDate]);
+  useEffect(() => {
+    hasExpiredRef.current = false;
+    setTimeLeft(calculateInitial(targetDate, durationSeconds));
+  }, [targetDate, durationSeconds]);
 
   useEffect(() => {
-    if (paused || timeLeft <= 0) return;
+    if (paused || timeLeft === null || timeLeft <= 0) return;
 
     const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        const next = prev - 1000;
-        if (next <= 0) {
+      if (targetDate) {
+        const target = typeof targetDate === "string" ? new Date(targetDate).getTime() : targetDate;
+        const next = Math.max(0, target - Date.now());
+        setTimeLeft(next);
+        if (next <= 0 && !hasExpiredRef.current) {
+          hasExpiredRef.current = true;
+          onExpireRef.current?.();
           clearInterval(interval);
-          if (!hasExpiredRef.current) {
-            hasExpiredRef.current = true;
-            onExpireRef.current?.();
-          }
-          return 0;
+        }
+        return;
+      }
+
+      setTimeLeft((previous) => {
+        if (previous === null) return previous;
+        const next = Math.max(0, previous - 1000);
+        if (next <= 0 && !hasExpiredRef.current) {
+          hasExpiredRef.current = true;
+          onExpireRef.current?.();
+          clearInterval(interval);
         }
         return next;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [paused, timeLeft <= 0]);
+  }, [paused, targetDate, timeLeft === null, timeLeft !== null && timeLeft <= 0]);
 
-  const totalSeconds = Math.max(0, Math.ceil(timeLeft / 1000));
+  const ready = timeLeft !== null;
+  const totalSeconds = ready ? Math.max(0, Math.ceil(timeLeft / 1000)) : 0;
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  const formatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  const isExpired = timeLeft <= 0;
+  const formatted = ready
+    ? `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+    : "--:--";
+  const isExpired = ready && timeLeft <= 0;
 
   if (children) {
-    return <>{children({ minutes, seconds, total: totalSeconds, formatted, isExpired })}</>;
+    return <>{children({ minutes, seconds, total: totalSeconds, formatted, isExpired, ready })}</>;
   }
 
   return (
@@ -92,9 +104,6 @@ export function CountdownTimer({
   );
 }
 
-/**
- * Simple display-only countdown badge.
- */
 export function CountdownBadge({
   targetDate,
   durationSeconds,
@@ -110,10 +119,10 @@ export function CountdownBadge({
     <CountdownTimer targetDate={targetDate} durationSeconds={durationSeconds} onExpire={onExpire}>
       {({ formatted, isExpired }) => (
         <span
-          className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
             isExpired || variant === "urgent"
-              ? "text-destructive border-destructive/30 bg-destructive/5"
-              : "text-muted-foreground border-border bg-muted/30"
+              ? "border-destructive/30 bg-destructive/5 text-destructive"
+              : "border-border bg-muted/30 text-muted-foreground"
           }`}
         >
           <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
