@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   Suspense,
   useCallback,
@@ -9,7 +10,6 @@ import {
   useState,
 } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
 import { RotateCcw, ShieldCheck, X } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -18,9 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { OrderBlock } from "@/components/checkout/OrderBlock";
 import { CustomerBlock } from "@/components/checkout/CustomerBlock";
 import { PaymentWall } from "@/components/checkout/PaymentWall";
-import { CardPayment } from "@/components/checkout/methods/CardPayment";
-import { PhonePayment } from "@/components/checkout/methods/PhonePayment";
-import { AsyncPayment } from "@/components/checkout/methods/AsyncPayment";
 import { StatusScreen } from "@/components/checkout/StatusScreen";
 import { LanguageSelector } from "@/components/checkout/LanguageSelector";
 import { I18nProvider, useI18n } from "@/lib/i18n";
@@ -38,46 +35,96 @@ import {
   isInstantMethodCode,
   isMultibancoCheckoutData,
   isPhoneMethodCode,
+  isPixCheckoutData,
   isStripeCheckoutData,
 } from "@/types/checkout";
 
-function safeTargetOrigin(value: string | null): string {
-  if (!value) return "*";
+const CardPayment = dynamic(
+  () => import("@/components/checkout/methods/CardPayment").then((mod) => mod.CardPayment),
+  { loading: () => <MethodLoading /> }
+);
+
+const PhonePayment = dynamic(
+  () => import("@/components/checkout/methods/PhonePayment").then((mod) => mod.PhonePayment),
+  { loading: () => <MethodLoading /> }
+);
+
+const AsyncPayment = dynamic(
+  () => import("@/components/checkout/methods/AsyncPayment").then((mod) => mod.AsyncPayment),
+  { loading: () => <MethodLoading /> }
+);
+
+const PixPaymentForm = dynamic(
+  () => import("@/components/checkout/PixPaymentForm").then((mod) => mod.PixPaymentForm),
+  { loading: () => <MethodLoading /> }
+);
+
+function parseOrigin(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
   try {
-    return new URL(value).origin;
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" && url.hostname !== "localhost") return null;
+    return url.origin;
   } catch {
-    return "*";
+    return null;
   }
 }
 
 function postParent(
-  status: "SUCCESS" | "CLOSED" | "CANCELLED",
-  targetOrigin: string
+  payload: Record<string, unknown>,
+  targetOrigin: string | null
 ) {
-  if (typeof window !== "undefined" && window.parent !== window) {
-    window.parent.postMessage({ type: "XPAYMENTS_STATUS", status }, targetOrigin);
-  }
+  if (!targetOrigin || typeof window === "undefined" || window.parent === window) return;
+  window.parent.postMessage(payload, targetOrigin);
+}
+
+function MethodLoading() {
+  return (
+    <div className="rounded-[24px] border border-border/40 bg-card/90 p-5 shadow-sm">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-2xl" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-3.5 w-36" />
+          <Skeleton className="h-3 w-52 max-w-full" />
+        </div>
+      </div>
+      <Skeleton className="mt-5 h-12 w-full rounded-2xl" />
+    </div>
+  );
 }
 
 function CheckoutSkeleton() {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="sticky top-0 z-50 backdrop-blur-2xl bg-background/90 border-b border-border/20">
-        <div className="max-w-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_50%_-10%,rgba(15,23,42,.05),transparent_38%),linear-gradient(180deg,#fff,#fafafa)] text-foreground">
+      <header className="border-b border-border/20 bg-background/90">
+        <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <Skeleton className="h-8 w-8 rounded-lg" />
+            <Skeleton className="h-8 w-8 rounded-xl" />
             <Skeleton className="h-4 w-28" />
           </div>
-          <Skeleton className="h-8 w-16 rounded-lg" />
+          <Skeleton className="h-7 w-20 rounded-full" />
         </div>
       </header>
-      <main className="flex-1 max-w-xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-8 space-y-4">
-        {["order", "customer", "methods"].map((key) => (
-          <div key={key} className="rounded-2xl border border-border/20 bg-card/60 p-5 sm:p-6 space-y-4">
-            <Skeleton className="h-5 w-36" />
-            <Skeleton className="h-14 w-full rounded-xl" />
+      <main className="mx-auto w-full max-w-xl space-y-3.5 px-4 py-5 sm:px-6 sm:py-7">
+        <div className="rounded-[26px] border border-border/25 bg-card/85 p-5">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="mx-auto mt-6 h-10 w-44" />
+          <Skeleton className="mx-auto mt-3 h-3 w-28" />
+        </div>
+        <div className="rounded-[26px] border border-border/25 bg-card/85 p-5">
+          <Skeleton className="h-4 w-36" />
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Skeleton className="h-12 rounded-xl" />
+            <Skeleton className="h-12 rounded-xl" />
           </div>
-        ))}
+        </div>
+        <div className="rounded-[26px] border border-border/25 bg-card/85 p-5">
+          <Skeleton className="h-4 w-32" />
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Skeleton className="h-28 rounded-[20px]" />
+            <Skeleton className="h-28 rounded-[20px]" />
+          </div>
+        </div>
       </main>
     </div>
   );
@@ -91,12 +138,7 @@ function CheckoutPageInner() {
 
   const embedded = searchParams.get("embedded") === "1";
   const returnedFromProvider =
-    searchParams.get("return") === "1" ||
-    searchParams.get("status") === "success";
-  const parentOrigin = useMemo(
-    () => safeTargetOrigin(searchParams.get("parent_origin")),
-    [searchParams]
-  );
+    searchParams.get("return") === "1" || searchParams.get("status") === "success";
 
   const [step, setStep] = useState<CheckoutStep>("loading");
   const [session, setSession] = useState<CheckoutSession | null>(null);
@@ -109,6 +151,22 @@ function CheckoutPageInner() {
   const [initiateResult, setInitiateResult] = useState<NormalisedInitiateResult | null>(null);
   const [phoneSubmitted, setPhoneSubmitted] = useState(false);
   const successNotified = useRef(false);
+  const readyNotified = useRef(false);
+
+  const requestedParentOrigin = useMemo(
+    () => parseOrigin(searchParams.get("parent_origin")),
+    [searchParams]
+  );
+
+  const configuredAllowedOrigin = useMemo(
+    () => parseOrigin(session?.metadata?.allowedOrigin),
+    [session?.metadata?.allowedOrigin]
+  );
+
+  const parentOrigin = useMemo(() => {
+    if (configuredAllowedOrigin && requestedParentOrigin !== configuredAllowedOrigin) return null;
+    return configuredAllowedOrigin || requestedParentOrigin;
+  }, [configuredAllowedOrigin, requestedParentOrigin]);
 
   useEffect(() => {
     const forcedTheme = searchParams.get("theme");
@@ -147,11 +205,32 @@ function CheckoutPageInner() {
     void load();
   }, [params?.sessionId, returnedFromProvider, t]);
 
+  useEffect(() => {
+    if (!embedded || !session || step === "loading" || readyNotified.current) return;
+    if (configuredAllowedOrigin && requestedParentOrigin !== configuredAllowedOrigin) return;
+    readyNotified.current = true;
+    postParent(
+      {
+        type: "XPAYMENTS_READY",
+        sessionId: session.sessionId,
+        storeId: session.storeId || null,
+      },
+      parentOrigin
+    );
+  }, [
+    embedded,
+    session,
+    step,
+    parentOrigin,
+    configuredAllowedOrigin,
+    requestedParentOrigin,
+  ]);
+
   const handlePollingSuccess = useCallback(() => {
     setStep("success");
     if (!successNotified.current) {
       successNotified.current = true;
-      postParent("SUCCESS", parentOrigin);
+      postParent({ type: "XPAYMENTS_STATUS", status: "SUCCESS" }, parentOrigin);
     }
   }, [parentOrigin]);
 
@@ -163,7 +242,7 @@ function CheckoutPageInner() {
   const pollingEnabled =
     step === "awaiting" ||
     step === "processing" ||
-    (selectedCode === "multibanco" && Boolean(initiateResult));
+    ((selectedCode === "multibanco" || selectedCode === "pix") && Boolean(initiateResult));
 
   usePolling({
     sessionId: params?.sessionId || "",
@@ -195,10 +274,9 @@ function CheckoutPageInner() {
     const url = new URL(`/pay/${params.sessionId}`, window.location.origin);
     url.searchParams.set("return", "1");
     if (embedded) url.searchParams.set("embedded", "1");
-    const requestedParentOrigin = searchParams.get("parent_origin");
     if (requestedParentOrigin) url.searchParams.set("parent_origin", requestedParentOrigin);
     return url.toString();
-  }, [embedded, params?.sessionId, searchParams]);
+  }, [embedded, params?.sessionId, requestedParentOrigin]);
 
   const doInitiate = useCallback(
     async (methodCode: string, phone?: string) => {
@@ -220,10 +298,7 @@ function CheckoutPageInner() {
         });
 
         setInitiateResult(result);
-
-        if (isPhoneMethodCode(methodCode)) {
-          setStep("awaiting");
-        }
+        if (isPhoneMethodCode(methodCode)) setStep("awaiting");
       } catch (err) {
         setInitiateError(err instanceof Error ? err.message : t("error.initiateFailed"));
         setSelectedMethod(null);
@@ -265,13 +340,17 @@ function CheckoutPageInner() {
     setStep("checkout");
   }, []);
 
+  const handleClose = useCallback(() => {
+    postParent({ type: "XPAYMENTS_STATUS", status: "CLOSED" }, parentOrigin);
+  }, [parentOrigin]);
+
   if (step === "loading") return <CheckoutSkeleton />;
 
-  const brandColor = session?.primaryColor || "#111111";
+  const brandColor = session?.primaryColor || "#111827";
 
   if (step === "error" || !session) {
     return (
-      <CheckoutFrame embedded={embedded}>
+      <CheckoutFrame embedded={embedded} brandColor={brandColor}>
         {!embedded && <MinimalHeader />}
         <main className="flex-1">
           <StatusScreen
@@ -288,14 +367,9 @@ function CheckoutPageInner() {
 
   if (step === "expired") {
     return (
-      <CheckoutFrame embedded={embedded}>
-        <CheckoutHeader
-          session={session}
-          brandColor={brandColor}
-          embedded={embedded}
-          onClose={() => postParent("CLOSED", parentOrigin)}
-        />
-        <main className="flex-1 flex items-center justify-center px-4">
+      <CheckoutFrame embedded={embedded} brandColor={brandColor}>
+        <CheckoutHeader session={session} brandColor={brandColor} embedded={embedded} onClose={handleClose} />
+        <main className="flex flex-1 items-center justify-center px-4">
           <StatusScreen step="expired" brandColor={brandColor} />
         </main>
         {!embedded && <MinimalFooter />}
@@ -306,14 +380,9 @@ function CheckoutPageInner() {
   if (step === "success") {
     const merchantReturnUrl = session.returnUrl || session.metadata?.returnUrl || undefined;
     return (
-      <CheckoutFrame embedded={embedded}>
-        <CheckoutHeader
-          session={session}
-          brandColor={brandColor}
-          embedded={embedded}
-          onClose={() => postParent("CLOSED", parentOrigin)}
-        />
-        <main className="flex-1 flex items-center justify-center px-4">
+      <CheckoutFrame embedded={embedded} brandColor={brandColor}>
+        <CheckoutHeader session={session} brandColor={brandColor} embedded={embedded} onClose={handleClose} />
+        <main className="flex flex-1 items-center justify-center px-4">
           <StatusScreen
             step="success"
             brandColor={brandColor}
@@ -328,14 +397,9 @@ function CheckoutPageInner() {
 
   if (step === "processing" || step === "awaiting" || step === "cancelled") {
     return (
-      <CheckoutFrame embedded={embedded}>
-        <CheckoutHeader
-          session={session}
-          brandColor={brandColor}
-          embedded={embedded}
-          onClose={() => postParent("CLOSED", parentOrigin)}
-        />
-        <main className="flex-1 flex items-center justify-center px-4">
+      <CheckoutFrame embedded={embedded} brandColor={brandColor}>
+        <CheckoutHeader session={session} brandColor={brandColor} embedded={embedded} onClose={handleClose} />
+        <main className="flex flex-1 items-center justify-center px-4">
           <StatusScreen
             step={step}
             brandColor={brandColor}
@@ -351,6 +415,7 @@ function CheckoutPageInner() {
   const amountText = formatCurrency(session.amount, session.currency);
   const checkoutData: CheckoutData | null = initiateResult?.checkoutData ?? null;
   const stripeData = checkoutData && isStripeCheckoutData(checkoutData) ? checkoutData : null;
+  const pixData = checkoutData && isPixCheckoutData(checkoutData) ? checkoutData : null;
   const multibancoData =
     checkoutData && isMultibancoCheckoutData(checkoutData) ? checkoutData : null;
   const isLocked = initiating || Boolean(initiateResult) || phoneSubmitted;
@@ -358,16 +423,11 @@ function CheckoutPageInner() {
   const initialEmail = String(session.metadata?.customerEmail ?? "");
 
   return (
-    <CheckoutFrame embedded={embedded}>
-      <CheckoutHeader
-        session={session}
-        brandColor={brandColor}
-        embedded={embedded}
-        onClose={() => postParent("CLOSED", parentOrigin)}
-      />
+    <CheckoutFrame embedded={embedded} brandColor={brandColor}>
+      <CheckoutHeader session={session} brandColor={brandColor} embedded={embedded} onClose={handleClose} />
 
-      <main className={`flex-1 px-4 sm:px-6 ${embedded ? "py-4 sm:py-5" : "py-5 sm:py-8"}`}>
-        <div className="max-w-xl mx-auto w-full space-y-4 sm:space-y-5">
+      <main className={`flex-1 px-4 sm:px-6 ${embedded ? "py-3.5 sm:py-4" : "py-5 sm:py-7"}`}>
+        <div className="mx-auto w-full max-w-xl space-y-3.5 sm:space-y-4">
           <OrderBlock session={session} brandColor={brandColor} onExpire={() => setStep("expired")} />
 
           <CustomerBlock
@@ -388,80 +448,73 @@ function CheckoutPageInner() {
             brandColor={brandColor}
           />
 
-          <AnimatePresence>
-            {initiating && (
-              <motion.div
-                className="rounded-2xl border border-border/20 bg-card/80 backdrop-blur-sm p-8 flex flex-col items-center justify-center space-y-4"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-              >
-                <div
-                  className="h-10 w-10 rounded-full border-2 border-t-transparent animate-spin"
-                  style={{ borderColor: `${brandColor}30`, borderTopColor: "transparent" }}
-                />
-                <p className="text-sm text-muted-foreground">{t("initiate.processing")}</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {initiating && (
+            <div className="rounded-[24px] border border-border/35 bg-card/90 p-7 text-center shadow-sm">
+              <div
+                className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-t-transparent"
+                style={{ borderColor: `${brandColor}2A`, borderTopColor: brandColor }}
+              />
+              <p className="mt-3 text-sm font-medium text-foreground">{t("initiate.processing")}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">A preparar a ligação segura ao método selecionado.</p>
+            </div>
+          )}
 
-          <AnimatePresence>
-            {initiateError && !initiating && (
-              <motion.div
-                className="rounded-2xl border border-destructive/20 bg-destructive/[0.03] p-4 sm:p-5"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-              >
-                <p className="text-sm text-destructive">{initiateError}</p>
-                <Button type="button" variant="outline" size="sm" className="mt-3 h-9 text-xs gap-1.5 rounded-lg" onClick={handleReset}>
-                  <RotateCcw className="h-3 w-3" />
-                  {t("error.tryAgain")}
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {initiateError && !initiating && (
+            <div className="rounded-[22px] border border-destructive/20 bg-destructive/[0.03] p-4 sm:p-5">
+              <p className="text-sm text-destructive">{initiateError}</p>
+              <Button type="button" variant="outline" size="sm" className="mt-3 h-9 gap-1.5 rounded-xl text-xs" onClick={handleReset}>
+                <RotateCcw className="h-3 w-3" />
+                {t("error.tryAgain")}
+              </Button>
+            </div>
+          )}
 
-          <AnimatePresence mode="wait">
-            {selectedMethod &&
-              isPhoneMethodCode(selectedMethod.code) &&
-              !initiating &&
-              step === "checkout" && (
-                <motion.div key="phone-payment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                  <PhonePayment
-                    method={selectedMethod.code}
-                    brandColor={brandColor}
-                    onSubmit={handlePhoneSubmit}
-                    isSubmitting={initiating}
-                    isWaiting={phoneSubmitted}
-                  />
-                </motion.div>
-              )}
-
-            {selectedMethod && stripeData && !initiating && (
-              <motion.div key={`stripe-${selectedMethod.code}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <CardPayment
-                  clientSecret={stripeData.clientSecret}
-                  publicKey={stripeData.publicKey}
-                  returnUrl={checkoutReturnUrl || window.location.href}
-                  brandColor={brandColor}
-                  amount={amountText}
-                />
-              </motion.div>
+          {selectedMethod &&
+            isPhoneMethodCode(selectedMethod.code) &&
+            !initiating &&
+            step === "checkout" && (
+              <PhonePayment
+                method={selectedMethod.code}
+                brandColor={brandColor}
+                onSubmit={handlePhoneSubmit}
+                isSubmitting={initiating}
+                isWaiting={phoneSubmitted}
+              />
             )}
 
-            {selectedCode === "multibanco" && multibancoData && !stripeData && !initiating && (
-              <motion.div key="multibanco-payment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <AsyncPayment
-                  data={multibancoData}
-                  session={session}
-                  brandColor={brandColor}
-                  variant="multibanco"
-                  onClose={handleReset}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {selectedMethod && stripeData && !initiating && (
+            <CardPayment
+              clientSecret={stripeData.clientSecret}
+              publicKey={stripeData.publicKey}
+              returnUrl={
+                checkoutReturnUrl ||
+                `https://checkout.xpayments.digital/pay/${session.sessionId}?return=1`
+              }
+              brandColor={brandColor}
+              amount={amountText}
+            />
+          )}
+
+          {selectedCode === "pix" && pixData && !initiating && (
+            <div className="rounded-[26px] border border-border/45 bg-card/95 p-5 shadow-[0_22px_64px_-46px_rgba(15,23,42,.55)] sm:p-6">
+              <PixPaymentForm
+                checkoutData={pixData}
+                session={session}
+                brandColor={brandColor}
+                onSuccess={handlePollingSuccess}
+              />
+            </div>
+          )}
+
+          {selectedCode === "multibanco" && multibancoData && !stripeData && !initiating && (
+            <AsyncPayment
+              data={multibancoData}
+              session={session}
+              brandColor={brandColor}
+              variant="multibanco"
+              onClose={handleReset}
+            />
+          )}
         </div>
       </main>
 
@@ -470,24 +523,42 @@ function CheckoutPageInner() {
   );
 }
 
-function CheckoutFrame({ embedded, children }: { embedded: boolean; children: React.ReactNode }) {
+function CheckoutFrame({
+  embedded,
+  brandColor,
+  children,
+}: {
+  embedded: boolean;
+  brandColor: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className={`${embedded ? "min-h-[100dvh]" : "min-h-screen"} flex flex-col bg-background text-foreground`}>
-      {children}
+    <div
+      className={`${embedded ? "min-h-[100dvh]" : "min-h-screen"} relative flex flex-col overflow-hidden bg-background text-foreground`}
+    >
+      <div
+        className="pointer-events-none fixed inset-x-0 top-0 h-72 opacity-[.06] blur-3xl"
+        style={{ background: `radial-gradient(circle at 50% 0%, ${brandColor}, transparent 62%)` }}
+      />
+      <div className="relative flex min-h-[inherit] flex-1 flex-col">{children}</div>
     </div>
   );
 }
 
 function MinimalHeader() {
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-2xl bg-background/90 border-b border-border/20">
-      <div className="max-w-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
-        <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center">
-          <span className="text-background font-bold text-[10px] tracking-tight">XP</span>
+    <header className="sticky top-0 z-50 border-b border-border/20 bg-background/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4 sm:px-6">
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-8 w-8 place-items-center rounded-xl bg-foreground text-[10px] font-bold tracking-tight text-background">XP</div>
+          <span className="text-xs font-semibold tracking-tight text-foreground">XPayments</span>
         </div>
         <div className="flex items-center gap-2">
           <LanguageSelector />
-          <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground/50" />
+          <div className="flex items-center gap-1.5 rounded-full border border-border/35 bg-background/70 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Seguro
+          </div>
         </div>
       </div>
     </header>
@@ -520,37 +591,42 @@ function CheckoutHeader({
   }, [embedded, onClose, session.returnUrl]);
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-2xl bg-background/90 border-b border-border/20">
-      <div className="max-w-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3 min-w-0">
+    <header className="sticky top-0 z-50 border-b border-border/20 bg-background/92 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-xl items-center justify-between px-4 sm:h-16 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            className="h-8 w-8 p-0 shrink-0 text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 rounded-lg"
+            className="h-8 w-8 shrink-0 rounded-xl p-0 text-muted-foreground/60 hover:bg-muted/50 hover:text-foreground"
             aria-label={t("header.close")}
           >
             <X className="h-4 w-4" />
           </Button>
 
           {session.logoUrl ? (
-            <img src={session.logoUrl} alt={session.storeName} className="h-7 w-auto max-w-[140px] object-contain" />
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="grid h-9 min-w-9 place-items-center overflow-hidden rounded-xl border border-border/30 bg-white px-1.5 shadow-sm">
+                <img src={session.logoUrl} alt={session.storeName} className="max-h-7 max-w-[112px] object-contain" />
+              </div>
+              <span className="hidden max-w-[150px] truncate text-sm font-semibold text-foreground sm:block">{session.storeName}</span>
+            </div>
           ) : (
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex min-w-0 items-center gap-2.5">
               <div
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shrink-0 tracking-tight"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[10px] font-bold tracking-tight text-white shadow-sm"
                 style={{ backgroundColor: brandColor }}
               >
                 {session.storeName.slice(0, 2).toUpperCase()}
               </div>
-              <span className="font-semibold text-sm text-foreground truncate">{session.storeName}</span>
+              <span className="max-w-[150px] truncate text-sm font-semibold text-foreground">{session.storeName}</span>
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-2">
           <LanguageSelector />
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/50 shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-border/35 bg-background/70 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
             <ShieldCheck className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t("header.secure")}</span>
           </div>
@@ -563,10 +639,11 @@ function CheckoutHeader({
 function MinimalFooter() {
   const { t } = useI18n();
   return (
-    <div className="mt-auto flex items-center justify-center gap-1.5 pt-6 pb-4 sm:pb-5 text-[11px] text-muted-foreground/30">
+    <footer className="mt-auto flex items-center justify-center gap-2 px-4 pb-5 pt-7 text-[10px] text-muted-foreground/55">
+      <ShieldCheck className="h-3.5 w-3.5" />
       <span>{t("footer.poweredBy")}</span>
-      <span className="font-semibold text-muted-foreground/40">{t("footer.xpayments")}</span>
-    </div>
+      <span className="font-semibold text-muted-foreground/70">{t("footer.xpayments")}</span>
+    </footer>
   );
 }
 
