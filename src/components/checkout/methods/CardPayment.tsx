@@ -74,7 +74,7 @@ function CheckoutForm({
             layout: {
               type: "accordion",
               defaultCollapsed: false,
-              radios: true,
+              radios: "always",
               spacedAccordionItems: true,
             },
           }}
@@ -113,7 +113,7 @@ function CheckoutForm({
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 pt-1 text-[10px] text-muted-foreground/65">
         <span className="inline-flex items-center gap-1.5">
           <ShieldCheck className="h-3.5 w-3.5" />
-          PCI-secure Stripe Elements
+          Ambiente de pagamento PCI seguro
         </span>
         <span className="inline-flex items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5" />
@@ -249,7 +249,7 @@ export function CardPayment({
             <div>
               <h3 className="text-sm font-semibold tracking-tight">Pagamento por cartão e wallets</h3>
               <p className="mt-0.5 max-w-[310px] text-[10.5px] leading-4 text-muted-foreground">
-                O Stripe Payment Element apresenta apenas as opções elegíveis e configuradas para este pagamento.
+                Apresentamos apenas as opções elegíveis e configuradas para este pagamento.
               </p>
             </div>
           </div>
