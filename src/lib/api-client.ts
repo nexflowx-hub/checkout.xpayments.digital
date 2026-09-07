@@ -66,6 +66,7 @@ function normalizeSession(
 
   const internalStoreName = optionalString(raw.internalStoreName);
   const reference = optionalString(raw.reference);
+  const description = optionalString(raw.description) ?? optionalString(metadata.description);
   const storeId = optionalString(raw.storeId);
   const logoUrl = optionalString(raw.logoUrl);
   const primaryColor = optionalString(raw.primaryColor);
@@ -77,6 +78,7 @@ function normalizeSession(
 
   if (internalStoreName) session.internalStoreName = internalStoreName;
   if (reference) session.reference = reference;
+  if (description) session.description = description;
   if (storeId) session.storeId = storeId;
   if (logoUrl) session.logoUrl = logoUrl;
   if (primaryColor) session.primaryColor = primaryColor;
