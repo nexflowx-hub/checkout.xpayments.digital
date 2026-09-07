@@ -74,7 +74,7 @@ function CheckoutForm({
             layout: {
               type: "accordion",
               defaultCollapsed: false,
-              radios: true,
+              radios: "always",
               spacedAccordionItems: true,
             },
           }}
