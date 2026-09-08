@@ -1,22 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_MASTER_API || "https://api.xpayments.digital";
 
 interface UsePollingOptions {
   sessionId: string;
-  /** Whether polling is active for the current checkout step */
   enabled?: boolean;
-  /** How often to poll (ms) */
+  /** Base interval after the fast confirmation window. */
   interval?: number;
-  /** Max number of polls before stopping */
   maxAttempts?: number;
-  /** Callback on successful payment */
   onSuccess: () => void;
-  /** Callback on failure/error */
   onError?: (err: string) => void;
-  /** Callback on expired session */
   onExpired?: () => void;
 }
 
@@ -26,9 +21,20 @@ interface UsePollingReturn {
   stopPolling: () => void;
 }
 
+function nextDelay(attempt: number, baseInterval: number): number {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    return Math.max(baseInterval, 5000);
+  }
+
+  if (attempt <= 10) return Math.min(baseInterval, 1500);
+  if (attempt <= 30) return Math.min(baseInterval, 2500);
+  return Math.max(baseInterval, 3500);
+}
+
 /**
- * Polls the session status until payment is confirmed or timeout.
- * Uses the GET /api/v1/checkout/session/:id endpoint.
+ * Polls checkout status without overlapping requests.
+ * It checks aggressively during the first confirmation window and then backs
+ * off, reducing DB/API pressure while keeping MB WAY/PIX success feedback fast.
  */
 export function usePolling({
   sessionId,
@@ -42,14 +48,14 @@ export function usePolling({
   const [isPolling, setIsPolling] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const stoppedRef = useRef(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopPolling = useCallback(() => {
     stoppedRef.current = true;
     setIsPolling(false);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
   }, []);
 
@@ -66,9 +72,17 @@ export function usePolling({
 
     let count = 0;
 
+    const schedule = () => {
+      if (stoppedRef.current) return;
+      timerRef.current = setTimeout(() => {
+        void poll();
+      }, nextDelay(count, interval));
+    };
+
     async function poll() {
       if (stoppedRef.current) return;
-      count++;
+
+      count += 1;
       setAttempts(count);
 
       if (count > maxAttempts) {
@@ -78,52 +92,44 @@ export function usePolling({
       }
 
       try {
-        const res = await fetch(
-          `${API_URL}/api/v1/checkout/session/${sessionId}`,
-          { cache: "no-store" }
-        );
+        const res = await fetch(`${API_URL}/api/v1/checkout/session/${sessionId}`, {
+          cache: "no-store",
+        });
 
-        if (!res.ok) {
-          // Server error — keep polling
-          return;
-        }
+        if (res.ok) {
+          const raw = await res.json();
+          const envelope = raw.data ?? raw;
+          const status = String(envelope.status ?? "").toLowerCase();
 
-        const raw = await res.json();
-        const envelope = raw.data ?? raw;
+          if (["paid", "completed", "succeeded"].includes(status)) {
+            stopPolling();
+            onSuccess();
+            return;
+          }
 
-        // Check session status
-        const status = String(envelope.status ?? "").toLowerCase();
-
-        if (["paid", "completed", "succeeded"].includes(status)) {
-          stopPolling();
-          onSuccess();
-          return;
-        }
-
-        if (["expired", "cancelled", "canceled", "failed"].includes(status)) {
-          stopPolling();
-          if (status === "expired") {
-            onExpired?.();
-          } else {
-            onError?.(`Status: ${status}`);
+          if (["expired", "cancelled", "canceled", "failed"].includes(status)) {
+            stopPolling();
+            if (status === "expired") onExpired?.();
+            else onError?.(`Status: ${status}`);
+            return;
           }
         }
       } catch (err) {
-        // Network error — keep polling, don't crash
+        // A transient network/DB error must not abort an asynchronous payment.
         console.warn("[polling] Error:", err);
       }
+
+      schedule();
     }
 
-    // Initial poll
     void poll();
 
-    // Subsequent polls
-    intervalRef.current = setInterval(() => {
-      void poll();
-    }, interval);
-
     return () => {
-      stopPolling();
+      stoppedRef.current = true;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
   }, [
     enabled,

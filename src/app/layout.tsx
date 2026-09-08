@@ -7,11 +7,13 @@ import { Toaster } from "@/components/ui/toaster";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const viewport: Viewport = {
@@ -42,7 +44,6 @@ export const metadata: Metadata = {
     "white-label checkout",
     "payment gateway",
     "multi-gateway",
-    "Stripe",
     "pagamento",
     "gateway de pagamento",
     "checkout seguro",
@@ -94,8 +95,8 @@ export default function RootLayout({
   return (
     <html lang="pt" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://api.xpayments.digital" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://api.xpayments.digital" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
